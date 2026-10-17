@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VoiceOSCE 🎙️🏥 | Cognitive Clinical Simulation</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0fdf4', 500: '#22c55e', 600: '#16a34a', 700: '#15803d' },
+            clinical: { 800: '#0f172a', 900: '#020617', card: '#1e293b' }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.03); } }
+    .recording-pulse { animation: pulse-slow 1.2s infinite ease-in-out; }
+    .glassmorphism { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40 px-4 lg:px-8 py-3.5 flex items-center justify-between shadow-sm">
+    <div class="flex items-center space-x-3 cursor-pointer" onclick="showView('cases-view')">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
+        <i class="fa-solid fa-stethoscope text-lg"></i>
+      </div>
+      <div>
+        <div class="flex items-center space-x-2">
+          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">VoiceOSCE</span>
+          <span class="text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full">v1.5 PRO</span>
+        </div>
+        <p class="text-xs text-slate-400">Practicum Script &bull; PassMedicine &bull; Edge Neural Voice</p>
+      </div>
+    </div>
+
+    <!-- Candidate & Header Controls -->
+    <div class="flex items-center space-x-4">
+      <div class="hidden sm:flex items-center space-x-2 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700/60 text-xs">
+        <i class="fa-solid fa-user-doctor text-emerald-400"></i>
+        <input type="text" id="candidate-name-input" value="Dr. Noah Lim" class="bg-transparent border-none text-slate-200 focus:outline-none w-28 font-medium">
+      </div>
+      <button onclick="toggleAudioMute()" id="mute-btn" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 transition" title="Toggle Patient Speech Playback">
+        <i class="fa-solid fa-volume-high text-sm text-emerald-400" id="mute-icon"></i>
+      </button>
+      <button onclick="showView('cases-view')" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-3.5 py-2 rounded-lg transition shadow-sm flex items-center space-x-1.5">
+        <i class="fa-solid fa-list-check"></i>
+        <span>All Stations</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col">
+
+    <!-- VIEW 1: CASE BROWSER -->
+    <section id="cases-view" class="space-y-6">
+      <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">OSCE Clinical Examination Library</h1>
+          <p class="text-sm text-slate-400 mt-1">High-stakes clinical stations with gated patient personas, Practicum Script perturbations, and oral examiner vivas.</p>
+        </div>
+        <!-- Specialty Filter Tabs -->
+        <div class="flex flex-wrap gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800 max-w-full overflow-x-auto text-xs font-medium" id="specialty-filters">
+          <button onclick="filterCases('all')" class="filter-tab px-3 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm" data-specialty="all">All Specialties</button>
+          <button onclick="filterCases('Cardiology')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Cardiology">Cardiology</button>
+          <button onclick="filterCases('Orthopedics')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Orthopedics">Orthopedics</button>
+          <button onclick="filterCases('Neurology')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Neurology">Neurology</button>
+          <button onclick="filterCases('Respiratory')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Respiratory">Respiratory</button>
+          <button onclick="filterCases('Gastroenterology')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Gastroenterology">Gastro</button>
+          <button onclick="filterCases('Obstetrics')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Obstetrics">Ob-Gyn</button>
+          <button onclick="filterCases('Psychiatry')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Psychiatry">Psychiatry</button>
+          <button onclick="filterCases('Pediatrics')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Pediatrics">Pediatrics</button>
+          <button onclick="filterCases('Endocrinology')" class="filter-tab px-3 py-1.5 rounded-lg text-slate-400 hover:text-white" data-specialty="Endocrinology">Endo</button>
+        </div>
+      </div>
+
+      <!-- Case Grid -->
+      <div id="cases-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 pt-2">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- VIEW 2: CANDIDATE BRIEF (OUTSIDE THE ROOM) -->
+    <section id="brief-view" class="hidden max-w-3xl mx-auto w-full space-y-6">
+      <div class="glassmorphism rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-2xl space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-700/60 pb-4">
+          <div class="flex items-center space-x-3">
+            <span class="w-3 h-3 rounded-full bg-amber-400 animate-ping"></span>
+            <span class="text-xs uppercase tracking-wider font-semibold text-amber-400">Door Notice &bull; 60 Seconds Reading Time</span>
+          </div>
+          <span id="brief-specialty-badge" class="px-2.5 py-1 text-xs rounded-full bg-slate-800 text-slate-300 font-medium">Specialty</span>
+        </div>
+
+        <div>
+          <h2 id="brief-case-title" class="text-2xl font-bold text-white">Station Title</h2>
+          <p id="brief-setting" class="text-sm text-slate-400 mt-1 flex items-center space-x-2">
+            <i class="fa-solid fa-hospital text-emerald-400"></i>
+            <span>Setting</span>
+          </p>
+        </div>
+
+        <!-- Patient Demographics & Complaint -->
+        <div class="bg-slate-900/80 rounded-xl p-4 border border-slate-800 space-y-2">
+          <div class="flex justify-between items-center text-sm">
+            <span class="text-slate-400">Patient:</span>
+            <span id="brief-patient-demo" class="font-semibold text-slate-200">Name (Age/Sex)</span>
+          </div>
+          <div class="flex justify-between items-start text-sm">
+            <span class="text-slate-400">Chief Complaint:</span>
+            <span id="brief-complaint" class="font-semibold text-amber-300 text-right max-w-md">Presenting Complaint</span>
+          </div>
+        </div>
+
+        <!-- Triage Vitals Grid -->
+        <div>
+          <h3 class="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-3 flex items-center space-x-1.5">
+            <i class="fa-solid fa-heart-pulse text-rose-400"></i>
+            <span>Triage Vital Signs</span>
+          </h3>
+          <div id="brief-vitals-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- Candidate Instructions -->
+        <div class="bg-emerald-950/30 border border-emerald-800/40 rounded-xl p-4 text-sm text-emerald-200/90 space-y-1">
+          <div class="font-semibold text-emerald-400 flex items-center space-x-1.5">
+            <i class="fa-solid fa-clipboard-check"></i>
+            <span>Candidate Instructions:</span>
+          </div>
+          <p id="brief-instructions" class="text-xs sm:text-sm text-slate-300 leading-relaxed"></p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+          <button onclick="showView('cases-view')" class="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-sm transition">
+            &larr; Back to Stations
+          </button>
+          <button onclick="startConsultationSession()" class="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-bold text-sm sm:text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center space-x-2 transition">
+            <span>🚪 Enter Consultation Room (Start 7-Min Timer)</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: CONSULTATION ROOM -->
+    <section id="consultation-view" class="hidden flex-1 flex flex-col gap-4">
+      <!-- Station Status Bar -->
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-bold" id="consult-patient-avatar">
+            P
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span id="consult-patient-name" class="font-bold text-slate-100 text-sm sm:text-base">Patient Name</span>
+              <span id="consult-pain-badge" class="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-medium">Pain 8/10</span>
+            </div>
+            <p id="consult-station-title" class="text-xs text-slate-400 truncate max-w-xs sm:max-w-md">Station Title</p>
+          </div>
+        </div>
+
+        <!-- 7-Minute Timer Ring -->
+        <div class="flex items-center space-x-4">
+          <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1.5 rounded-lg border border-slate-800">
+            <i class="fa-regular fa-clock text-emerald-400 animate-pulse text-sm"></i>
+            <span id="consult-timer" class="font-mono text-base sm:text-lg font-bold text-emerald-400">07:00</span>
+          </div>
+          <button onclick="endConsultationEarly()" class="px-3.5 py-1.5 rounded-lg bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border border-amber-500/30 text-xs font-semibold transition">
+            Finish & Call Examiner &rarr;
+          </button>
+        </div>
+      </div>
+
+      <!-- Split Layout: Chat & Gate Tracker -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 flex-1 min-h-[480px]">
+
+        <!-- Left: Interactive Consultation Dialogue -->
+        <div class="lg:col-span-2 flex flex-col glassmorphism rounded-2xl border border-slate-800 overflow-hidden shadow-lg">
+          <!-- Chat Messages Container -->
+          <div id="chat-messages" class="flex-1 p-4 sm:p-6 overflow-y-auto space-y-4 max-h-[520px]">
+            <!-- Injected by JS -->
+          </div>
+
+          <!-- Bottom Voice / Text Controls -->
+          <div class="p-3 sm:p-4 bg-slate-900/90 border-t border-slate-800 flex items-center gap-2 sm:gap-3">
+            <button onclick="toggleMicrophoneRecord()" id="mic-record-btn" class="p-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/30 transition flex items-center justify-center shrink-0 shadow-sm" title="Record Voice">
+              <i class="fa-solid fa-microphone text-lg" id="mic-icon"></i>
+            </button>
+            <input type="text" id="candidate-text-input" placeholder="Ask patient a question (e.g. 'Where does the pain radiate?')..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-4 py-3 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition">
+            <button onclick="sendCandidateMessage()" class="px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition shrink-0 flex items-center space-x-1.5 shadow-sm">
+              <span>Send</span>
+              <i class="fa-solid fa-paper-plane text-xs"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right: Calgary-Cambridge Live Gate Checklist -->
+        <div class="glassmorphism rounded-2xl border border-slate-800 p-4 sm:p-5 flex flex-col space-y-4 shadow-lg overflow-y-auto max-h-[600px]">
+          <div class="flex items-center justify-between border-b border-slate-700/60 pb-3">
+            <div class="flex items-center space-x-2">
+              <i class="fa-solid fa-list-check text-emerald-400 text-sm"></i>
+              <h3 class="font-bold text-sm text-slate-200">Calgary-Cambridge Gates</h3>
+            </div>
+            <span id="gates-unlocked-counter" class="text-xs font-semibold bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full">0/0 Unlocked</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Ask targeted history, Calgary-Cambridge ICE, and screen life-threatening red flags to unlock gates in real-time.</p>
+
+          <div id="gates-checklist-container" class="space-y-2 flex-1 text-xs">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- MODAL: PRACTICUM SCRIPT PERTURBATION -->
+    <div id="perturbation-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+      <div class="glassmorphism border border-emerald-500/40 rounded-2xl max-w-xl w-full p-6 sm:p-8 space-y-5 shadow-2xl shadow-emerald-500/10 animate-fade-in">
+        <div class="flex items-center space-x-3 text-emerald-400">
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center">
+            <i class="fa-solid fa-bell text-lg"></i>
+          </div>
+          <div>
+            <span class="text-xs uppercase tracking-wider font-bold text-emerald-400">Practicum Script Perturbation</span>
+            <h3 id="pert-title" class="text-lg font-bold text-white">Interim Clinical Finding</h3>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-xl p-4 border border-slate-800 space-y-3">
+          <p id="pert-description" class="text-xs text-slate-300 leading-relaxed"></p>
+          <div id="pert-findings-list" class="space-y-1.5 text-xs font-mono bg-slate-950 p-3 rounded-lg border border-slate-800 text-emerald-300">
+            <!-- Findings injected -->
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold text-slate-300">
+            🧠 Clinical Reasoning: How does this new finding alter your diagnostic probabilities?
+          </label>
+          <textarea id="pert-reasoning-input" rows="3" placeholder="State which conditions are reinforced (+1/+2) or ruled out (-1/-2) based on this finding..." class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-emerald-500"></textarea>
+        </div>
+
+        <button onclick="submitPerturbationReasoning()" class="w-full py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition shadow-lg shadow-emerald-600/25">
+          Submit Probability Shift & Benchmark with Experts &rarr;
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW 4: POST-STATION EXAMINER VIVA -->
+    <section id="viva-view" class="hidden max-w-3xl mx-auto w-full space-y-6">
+      <div class="glassmorphism rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-2xl space-y-6">
+        <div class="flex items-center justify-between border-b border-slate-700/60 pb-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-full bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+              <i class="fa-solid fa-graduation-cap text-lg"></i>
+            </div>
+            <div>
+              <span class="text-xs font-semibold uppercase tracking-wider text-purple-400">Phase 2: Senior Examiner Viva</span>
+              <h2 class="text-lg font-bold text-white">Post-Station Oral Interrogation</h2>
+            </div>
+          </div>
+          <span id="viva-progress" class="text-xs bg-slate-800 text-slate-300 px-3 py-1 rounded-full font-medium">Question 1/3</span>
+        </div>
+
+        <!-- Examiner Question Card -->
+        <div class="bg-slate-900/90 rounded-xl p-5 border border-slate-800 space-y-4">
+          <div class="flex items-start space-x-3">
+            <div class="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center text-purple-400 shrink-0 mt-0.5">
+              <i class="fa-solid fa-user-tie text-sm"></i>
+            </div>
+            <div class="flex-1 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-purple-300">Senior Consultant Examiner (Oral Prompt):</span>
+                <button onclick="replayExaminerAudio()" id="replay-viva-btn" class="text-xs text-slate-400 hover:text-white flex items-center space-x-1">
+                  <i class="fa-solid fa-rotate-right text-[10px]"></i>
+                  <span>Replay Voice</span>
+                </button>
+              </div>
+              <p id="viva-question-prompt" class="text-sm sm:text-base font-semibold text-slate-100 leading-relaxed">
+                Loading viva question...
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Candidate Viva Answer Box -->
+        <div class="space-y-3">
+          <label class="block text-xs font-semibold text-slate-300">Your Spoken / Typed Clinical Answer:</label>
+          <div class="flex gap-2">
+            <textarea id="viva-answer-input" rows="4" placeholder="Present your structured SBAR summary, differentials, or management plan..." class="flex-1 bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs sm:text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:border-purple-500"></textarea>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3">
+          <button onclick="submitVivaAnswer()" class="px-6 py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-sm transition shadow-lg shadow-purple-600/25 flex items-center space-x-2">
+            <span>Submit Viva Answer</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: COMPREHENSIVE SCORECARD & AUDIT -->
+    <section id="scorecard-view" class="hidden max-w-4xl mx-auto w-full space-y-6">
+      <div class="glassmorphism rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-2xl space-y-6">
+        <!-- Header & Stamp -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-700/60 pb-6">
+          <div>
+            <span class="text-xs uppercase tracking-wider font-semibold text-slate-400">Official OSCE Performance Report</span>
+            <h2 id="card-case-title" class="text-2xl font-black text-white mt-0.5">Station Title</h2>
+            <p id="card-candidate-name" class="text-xs text-slate-400 mt-1">Candidate: Dr. Noah Lim</p>
+          </div>
+          <div id="card-grade-badge" class="px-5 py-2.5 rounded-xl text-center font-black tracking-wide text-sm border shadow-lg">
+            GRADE
+          </div>
+        </div>
+
+        <!-- Safety Gate Alert -->
+        <div id="card-safety-alert" class="rounded-xl p-4 border text-xs sm:text-sm flex items-start space-x-3">
+          <!-- Dynamic safety pass/fail -->
+        </div>
+
+        <!-- Domain Scores Progress Bars -->
+        <div class="space-y-4">
+          <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">Assessment Domain Breakdown</h3>
+          <div id="card-domains-container" class="space-y-3">
+            <!-- Dynamic domains -->
+          </div>
+        </div>
+
+        <!-- Practicum Cognitive Traps -->
+        <div id="card-traps-section" class="space-y-3 hidden">
+          <h3 class="text-sm font-bold text-amber-400 uppercase tracking-wider flex items-center space-x-2">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Practicum Script Cognitive Bias Audit</span>
+          </h3>
+          <div id="card-traps-container" class="space-y-2"></div>
+        </div>
+
+        <!-- Actionable Remediation -->
+        <div class="space-y-2 bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Actionable Clinical Remediation:</h3>
+          <ul id="card-remediation-list" class="list-disc list-inside text-xs text-slate-400 space-y-1"></ul>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="flex flex-wrap justify-between items-center gap-3 pt-4 border-t border-slate-800">
+          <button onclick="showView('cases-view')" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">
+            &larr; Practice Another Station
+          </button>
+          <div class="flex gap-2">
+            <button onclick="copyMarkdownReport()" class="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium transition flex items-center space-x-1.5">
+              <i class="fa-regular fa-copy"></i>
+              <span>Copy Markdown</span>
+            </button>
+            <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-sm">
+              <i class="fa-solid fa-print"></i>
+              <span>Print Scorecard</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JAVASCRIPT APP LOGIC -->
+  <script src="/static/app.js"></script>
+</body>
+</html>

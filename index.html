@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
-  <meta name="theme-color" content="#090A0F">
-  <meta name="description" content="OSCEBlitz — Minimalist High-Velocity Clinical Reasoning & Red-Flag Trainer. 100 Clinical Cases.">
+  <meta name="theme-color" content="#090A10">
+  <meta name="description" content="OSCEBlitz — Minimalist High-Velocity Clinical Reasoning & Red-Flag Trainer for Medical Students. 100 High-Yield Stations.">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="OSCEBlitz">
-  <title>OSCEBlitz — Clinical Reasoning & Red-Flag Trainer</title>
+  <title>OSCEBlitz — Clinical Reasoning & Red-Flag Speed Trainer</title>
   <link rel="icon" href="icon-512.png">
   <link rel="apple-touch-icon" href="icon-512.png">
   <link rel="manifest" href="manifest.json">
@@ -30,9 +30,10 @@
             mono: ['JetBrains Mono', 'monospace']
           },
           colors: {
-            obsidian: '#090A0F',
-            surface: '#12141C',
-            surfaceHover: '#171A24'
+            obsidian: '#090A10',
+            surface: '#11131B',
+            surfaceHover: '#161924',
+            surfaceBorder: 'rgba(255, 255, 255, 0.07)'
           }
         }
       }
@@ -42,8 +43,8 @@
 
   <style>
     body {
-      background-color: #090A0F;
-      color: #F3F4F6;
+      background-color: #090A10;
+      color: #F1F5F9;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
     .hairline-border {
@@ -56,35 +57,36 @@
       border-top: 1px solid rgba(255, 255, 255, 0.07);
     }
     .card-surface {
-      background-color: #12141C;
+      background-color: #11131B;
       border: 1px solid rgba(255, 255, 255, 0.07);
     }
     .card-surface-interactive {
-      background-color: #12141C;
+      background-color: #11131B;
       border: 1px solid rgba(255, 255, 255, 0.07);
-      transition: border-color 0.15s ease, background-color 0.15s ease, transform 0.15s ease;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .card-surface-interactive:hover {
-      background-color: #161923;
+      background-color: #151824;
       border-color: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
     }
-    @keyframes pulse-subtle {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.55; }
+    @keyframes pulse-listening {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.06); opacity: 0.8; }
     }
-    .mic-listening {
-      animation: pulse-subtle 1.2s infinite ease-in-out;
+    .mic-active {
+      animation: pulse-listening 1.2s infinite ease-in-out;
     }
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
-    ::-webkit-scrollbar-track { background: #090A0F; }
-    ::-webkit-scrollbar-thumb { background: #27272A; border-radius: 3px; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #090A10; }
+    ::-webkit-scrollbar-thumb { background: #27272A; border-radius: 2px; }
     ::-webkit-scrollbar-thumb:hover { background: #3F3F46; }
 
-    /* Clean Print Stylesheet (Inspired by OSCE Study Cards Study Cards) */
+    /* Print Stylesheet for 1-Page PDF Study Cards */
     @media print {
       body {
         background: #FFFFFF !important;
-        color: #111827 !important;
+        color: #0F172A !important;
       }
       header, #cases-view, #consultation-view, #viva-view, .no-print {
         display: none !important;
@@ -97,148 +99,166 @@
       }
       .card-surface, .print-card {
         background: #FFFFFF !important;
-        border: 1px solid #D1D5DB !important;
-        color: #111827 !important;
+        border: 1px solid #CBD5E1 !important;
+        color: #0F172A !important;
         box-shadow: none !important;
       }
       .text-zinc-100, .text-white, .text-zinc-200, .text-zinc-300 {
-        color: #111827 !important;
+        color: #0F172A !important;
       }
       .text-zinc-400, .text-zinc-500 {
-        color: #4B5563 !important;
+        color: #475569 !important;
       }
     }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
 
-  <!-- MINIMALIST TOP HEADER (Shown on Library View, compact on other views) -->
-  <header id="app-header" class="hairline-border-b bg-[#090A0F]/90 backdrop-blur-md sticky top-0 z-40">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-3">
-      <!-- Left: Brand + Case Count -->
-      <div class="flex items-center gap-3 cursor-pointer" onclick="showView('cases-view')">
-        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xs font-bold">
+  <!-- ========================================================= -->
+  <!-- SLEEK TOP HEADER                                          -->
+  <!-- ========================================================= -->
+  <header id="app-header" class="hairline-border-b bg-[#090A10]/95 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 h-13 py-2.5 flex items-center justify-between gap-3">
+      <!-- Left: Logo & Brand -->
+      <div class="flex items-center gap-2.5 cursor-pointer select-none" onclick="showView('cases-view')">
+        <div class="w-7 h-7 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-xs font-bold shadow-sm">
           ⚡
         </div>
-        <div class="flex items-baseline gap-2.5">
-          <span class="font-semibold text-sm sm:text-base tracking-tight text-zinc-100">OSCEBlitz</span>
-          <span id="header-case-count" class="text-xs text-zinc-500 hidden sm:inline">100 Clinical Reasoning Cases</span>
+        <div class="flex items-baseline gap-2">
+          <span class="font-bold text-sm sm:text-base tracking-tight text-white">OSCEBlitz</span>
+          <span id="header-case-count" class="text-[11px] text-zinc-500 font-mono hidden sm:inline">100 Cases</span>
         </div>
       </div>
 
-      <!-- Right: Time Guide Pill + Approach Reference + Random Case -->
+      <!-- Right Actions: Pace Guide + Approach Drawer + Random Case -->
       <div class="flex items-center gap-2">
-        <button onclick="toggleTimeGuidePopover()" id="time-guide-btn" class="px-2.5 py-1.5 rounded-lg card-surface hover:border-zinc-700 text-xs text-zinc-300 font-mono flex items-center gap-1.5 transition" title="How long should each case take? Click for breakdown">
+        <button
+          onclick="toggleTimeGuidePopover()"
+          id="time-guide-btn"
+          class="px-2.5 py-1.5 rounded-lg card-surface hover:border-zinc-700 text-xs text-zinc-300 font-mono flex items-center gap-1.5 transition"
+          title="Recommended completion pace per station"
+        >
           <span>⏱️</span>
-          <span class="hidden md:inline">Target:</span>
-          <span class="text-emerald-400 font-medium">60s–120s / case</span>
+          <span class="hidden md:inline text-zinc-400">Pace:</span>
+          <span class="text-emerald-400 font-medium">60s–120s</span>
         </button>
 
-        <button onclick="toggleSymptomApproachDrawer()" id="approach-drawer-btn" class="px-2.5 py-1.5 rounded-lg card-surface hover:border-zinc-700 text-xs text-zinc-300 flex items-center gap-1.5 transition" title="Open Symptom Approach Generator (from OSCE repo)">
+        <button
+          onclick="toggleSymptomApproachDrawer()"
+          id="approach-drawer-btn"
+          class="px-2.5 py-1.5 rounded-lg card-surface hover:border-zinc-700 text-xs text-zinc-300 flex items-center gap-1.5 transition"
+          title="Open Clinical Approach Frameworks"
+        >
           <i class="fa-solid fa-book-medical text-zinc-400 text-[11px]"></i>
           <span class="hidden sm:inline">Approach Guide</span>
         </button>
 
-        <button onclick="startRandomCase()" class="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-medium text-xs flex items-center gap-1.5 transition shadow-sm">
+        <button
+          onclick="startRandomCase()"
+          class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs flex items-center gap-1.5 transition shadow-sm"
+        >
           <span>🎲</span>
-          <span>Random Case</span>
+          <span>Random Station</span>
         </button>
       </div>
     </div>
 
-    <!-- Collapsible Time Guide Breakdown Bar -->
-    <div id="time-guide-popover" class="hidden hairline-border-t bg-[#12141C]">
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div class="space-y-0.5">
-          <div class="font-medium text-zinc-200 flex items-center gap-2">
-            <span>⏱️ Recommended Pace: 60s–120s per Station</span>
-            <span class="text-[11px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded">80% faster than a 10-min OSCE</span>
+    <!-- Collapsible Time Guide Dropdown -->
+    <div id="time-guide-popover" class="hidden hairline-border-t bg-[#11131B]">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+        <div>
+          <div class="font-semibold text-zinc-200 flex items-center gap-2">
+            <span>⏱️ High-Velocity Speed Run: 60s–120s per Station</span>
+            <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">75% faster than standard OSCE</span>
           </div>
-          <p class="text-zinc-400 text-[11px]">
-            Zero conversational filler. Drill pure diagnostic schemas, red-flag exclusions, and acute management.
+          <p class="text-zinc-400 text-[11px] mt-0.5">
+            Skip conversational pleasantries. Spam multiple clinical queries simultaneously, catch all red flags, and formulate acute management.
           </p>
         </div>
-        <div class="flex flex-wrap items-center gap-2 font-mono text-[11px]">
-          <span class="px-2.5 py-1 rounded bg-[#090A0F] hairline-border text-zinc-300"><strong class="text-emerald-400">40s</strong> History Spam</span>
+        <div class="flex items-center gap-2 font-mono text-[11px] shrink-0">
+          <span class="px-2.5 py-1 rounded bg-[#090A10] hairline-border text-zinc-300"><strong class="text-emerald-400">40s</strong> History</span>
           <span class="text-zinc-600">→</span>
-          <span class="px-2.5 py-1 rounded bg-[#090A0F] hairline-border text-zinc-300"><strong class="text-rose-400">25s</strong> Red Flags</span>
+          <span class="px-2.5 py-1 rounded bg-[#090A10] hairline-border text-zinc-300"><strong class="text-rose-400">25s</strong> Red Flags</span>
           <span class="text-zinc-600">→</span>
-          <span class="px-2.5 py-1 rounded bg-[#090A0F] hairline-border text-zinc-300"><strong class="text-amber-400">25s</strong> Dx &amp; Plan</span>
+          <span class="px-2.5 py-1 rounded bg-[#090A10] hairline-border text-zinc-300"><strong class="text-amber-400">25s</strong> Dx &amp; Plan</span>
         </div>
       </div>
     </div>
 
-    <!-- Collapsible Symptom Approach Generator Drawer (Inspired by OSCE Study Cards) -->
-    <div id="symptom-approach-drawer" class="hidden hairline-border-t bg-[#12141C]">
-      <div class="max-w-5xl mx-auto px-4 sm:px-6 py-4 space-y-3">
+    <!-- Collapsible Symptom Approach Drawer -->
+    <div id="symptom-approach-drawer" class="hidden hairline-border-t bg-[#11131B]">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-4 space-y-3">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <span class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Symptom Approach Reference</span>
-            <span class="text-[11px] text-zinc-500">Structured Finals Frameworks</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Textbook Approach Reference</span>
+            <span class="text-[11px] text-zinc-500">Based on Kumar &amp; Clark, Harrison's, Oxford Clinical Handbook</span>
           </div>
           <button onclick="toggleSymptomApproachDrawer()" class="text-xs text-zinc-500 hover:text-zinc-300">Close ✕</button>
         </div>
         <div id="approach-cluster-pills" class="flex flex-wrap gap-1.5">
           <!-- Populated by JS -->
         </div>
-        <div id="approach-reference-content" class="bg-[#090A0F] hairline-border rounded-xl p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
+        <div id="approach-reference-content" class="bg-[#090A10] hairline-border rounded-xl p-4 grid grid-cols-1 md:grid-cols-4 gap-4 text-xs">
           <!-- Populated by JS -->
         </div>
       </div>
     </div>
   </header>
 
-  <!-- MAIN WORKSPACE -->
+  <!-- ========================================================= -->
+  <!-- MAIN WORKSPACE                                            -->
+  <!-- ========================================================= -->
   <main class="flex-1 w-full">
 
     <!-- ========================================================= -->
     <!-- VIEW 1: MINIMALIST CASE LIBRARY                           -->
     <!-- ========================================================= -->
-    <section id="cases-view" class="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+    <section id="cases-view" class="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-4">
 
-      <!-- Search & Blind Mode Controls -->
+      <!-- Search & Filters Strip -->
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <!-- Search Input -->
+        <!-- Search Bar with '/' Shortcut -->
         <div class="relative flex-1">
           <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 text-xs"></i>
           <input
             type="text"
             id="station-search-input"
             oninput="handleStationSearch(this.value)"
-            placeholder="Search symptom, complaint, or specialty..."
-            class="w-full card-surface rounded-xl pl-9 pr-4 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 transition"
+            placeholder="Search symptoms, complaints, organs, specialties... (Press '/' to focus)"
+            class="w-full card-surface rounded-xl pl-9 pr-10 py-2.5 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition"
           >
+          <span class="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-[10px] text-zinc-500 bg-[#090A10] px-1.5 py-0.5 rounded border border-white/5">/</span>
         </div>
 
-        <!-- Blind Mode Toggle (ON by default so diagnoses aren't spoiled) -->
+        <!-- Blind Mode Toggle -->
         <button
           id="blind-mode-btn"
           onclick="toggleBlindMode()"
-          class="px-3.5 py-2 rounded-xl card-surface hover:border-zinc-700 text-xs font-medium flex items-center justify-between sm:justify-start gap-2.5 transition shrink-0"
-          title="When Blind Mode is ON, cards show only the patient's presenting complaint so the diagnosis isn't spoiled."
+          class="px-3.5 py-2.5 rounded-xl card-surface hover:border-zinc-600 text-xs font-medium flex items-center justify-between sm:justify-start gap-2.5 transition shrink-0 select-none"
+          title="In Blind Mode, cards show only the patient's presenting complaint so the diagnosis is never spoiled."
         >
           <span id="blind-mode-icon" class="text-emerald-400">🔒</span>
-          <span id="blind-mode-label" class="text-zinc-200">Blind Mode (Hide Diagnoses)</span>
+          <span id="blind-mode-label" class="text-zinc-200">Blind Mode</span>
           <span id="blind-mode-pill" class="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">ON</span>
         </button>
       </div>
 
-      <!-- Horizontal Symptom / Mode Filter Pills -->
-      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar" id="specialty-filters">
-        <button onclick="filterCases('all')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-950 transition" data-specialty="all">
-          All
+      <!-- Specialty / Symptom Cluster Tabs -->
+      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar select-none" id="specialty-filters">
+        <button onclick="filterCases('all')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-950 transition" data-specialty="all">
+          All (100)
         </button>
         <button onclick="filterCases('sg_classics')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="sg_classics">
-          🇸🇬 SG Classics
+          🇸🇬 SG Classics (16)
         </button>
         <button onclick="filterCases('chest_pain')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="chest_pain">
           Chest Pain
         </button>
+        <button onclick="filterCases('fever')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="fever">
+          Fever &amp; Sepsis
+        </button>
         <button onclick="filterCases('abdominal_pain')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="abdominal_pain">
           Abdominal Pain
-        </button>
-        <button onclick="filterCases('fever')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="fever">
-          Fever
         </button>
         <button onclick="filterCases('dyspnea')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="dyspnea">
           Dyspnea
@@ -256,15 +276,15 @@
           Pediatrics
         </button>
         <button onclick="filterCases('psych')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="psych">
-          Psych
+          Psych &amp; Tox
         </button>
         <button onclick="filterCases('ent_eye')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="ent_eye">
           ENT &amp; Eye
         </button>
       </div>
 
-      <!-- Minimalist Case Grid -->
-      <div id="cases-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+      <!-- Case Grid -->
+      <div id="cases-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         <!-- Rendered by app.js -->
       </div>
     </section>
@@ -275,34 +295,34 @@
     <!-- ========================================================= -->
     <section id="consultation-view" class="hidden max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
 
-      <!-- Compact Station Top Bar -->
-      <div class="card-surface rounded-xl px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2">
-        <button onclick="exitStationToLibrary()" class="text-xs text-zinc-400 hover:text-zinc-100 font-medium flex items-center gap-1.5 transition">
-          <span>←</span>
-          <span>Exit</span>
+      <!-- Navigation & Triage Vitals Bar -->
+      <div class="card-surface rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+        <button onclick="exitStationToLibrary()" class="text-xs text-zinc-400 hover:text-white font-medium flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-arrow-left text-[10px]"></i>
+          <span>Library</span>
         </button>
 
-        <!-- Patient Demographic + Vitals Monospace Strip -->
-        <div id="consult-vitals-strip" class="font-mono text-[11px] text-zinc-300 truncate max-w-md sm:max-w-lg">
-          <!-- e.g. 19M NSF • BP 96/82 • HR 118 • RR 24 • T 36.9°C • SpO2 98% -->
+        <!-- Monospace Vitals Summary -->
+        <div id="consult-vitals-strip" class="font-mono text-[11px] text-zinc-300 truncate max-w-xs sm:max-w-md">
+          <!-- e.g. 19M NSF • BP 96/82 • HR 118 • T 36.9°C -->
         </div>
 
-        <!-- Right: Target Countdown Timer + Silent/Voice Toggle -->
+        <!-- Target Timer & Audio Toggle -->
         <div class="flex items-center gap-2">
           <div
-            class="px-2.5 py-1 rounded-lg bg-[#090A0F] hairline-border flex items-center gap-1.5 font-mono text-xs"
             id="consult-timer-box"
-            title="Target station pace: 40s History • 25s Red Flags • 25s Dx & Plan"
+            class="px-2.5 py-1 rounded-lg bg-[#090A10] hairline-border flex items-center gap-1.5 font-mono text-xs"
+            title="Target completion time"
           >
             <span class="text-zinc-500 text-[11px]">⏱️</span>
-            <span id="consult-timer" class="font-semibold text-emerald-400">01:30</span>
+            <span id="consult-timer" class="font-bold text-emerald-400">01:30</span>
           </div>
 
           <button
             onclick="toggleVoiceOutputMode()"
             id="voice-mode-btn"
-            class="px-2.5 py-1 rounded-lg bg-[#090A0F] hairline-border text-[11px] text-zinc-400 hover:text-zinc-200 transition flex items-center gap-1"
-            title="Toggle Silent Text vs 1.4x Spoken Patient Voice"
+            class="px-2.5 py-1 rounded-lg bg-[#090A10] hairline-border text-[11px] text-zinc-400 hover:text-zinc-200 transition flex items-center gap-1"
+            title="Toggle Silent Bullet Feed vs Spoken Voice Audio"
           >
             <span id="voice-mode-icon">🔇</span>
             <span id="voice-mode-label" class="hidden sm:inline">Silent</span>
@@ -310,33 +330,33 @@
         </div>
       </div>
 
-      <!-- Patient Opening Card + Subtle Progress Strip -->
-      <div class="card-surface rounded-xl p-4 space-y-3">
+      <!-- Patient Presentation Card -->
+      <div class="card-surface rounded-xl p-4 sm:p-5 space-y-3">
         <div class="flex items-start justify-between gap-3">
-          <div class="space-y-1">
+          <div class="space-y-1 flex-1">
             <div class="flex items-center gap-2">
-              <span id="consult-patient-demo" class="text-xs font-semibold text-zinc-200">Patient</span>
-              <span id="consult-setting-tag" class="text-[11px] text-zinc-500">• ED</span>
+              <span id="consult-patient-demo" class="text-xs font-bold text-zinc-200">Patient</span>
+              <span id="consult-setting-tag" class="text-[11px] text-zinc-500">• Emergency Department</span>
             </div>
-            <p id="consult-opening-quote" class="text-sm sm:text-base text-zinc-100 leading-relaxed font-medium">
+            <p id="consult-opening-quote" class="text-sm sm:text-base text-zinc-100 font-medium leading-relaxed">
               "..."
             </p>
             <p id="consult-behavioral-cue" class="text-xs text-zinc-500 italic"></p>
           </div>
         </div>
 
-        <!-- Subtle Progress Strip -->
-        <div class="pt-2.5 hairline-border-t flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div class="flex flex-wrap items-center gap-4">
-            <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+        <!-- Progress Counter & Peek Actions -->
+        <div class="pt-3 hairline-border-t flex flex-wrap items-center justify-between gap-3 text-xs">
+          <div class="flex items-center gap-4">
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-rose-400"></span>
               <span class="text-zinc-400">Red Flags:</span>
-              <span id="red-flags-counter" class="font-mono font-medium text-zinc-200">0/0</span>
+              <span id="red-flags-counter" class="font-mono font-bold text-white">0/0</span>
             </div>
-            <div class="flex items-center gap-2">
-              <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <div class="flex items-center gap-1.5">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
               <span class="text-zinc-400">Clues:</span>
-              <span id="gates-unlocked-counter" class="font-mono font-medium text-zinc-200">0/0</span>
+              <span id="gates-unlocked-counter" class="font-mono font-bold text-white">0/0</span>
             </div>
           </div>
 
@@ -344,8 +364,7 @@
             <button
               onclick="triggerInlineTwistBanner()"
               id="twist-trigger-btn"
-              class="text-[11px] text-zinc-400 hover:text-amber-300 transition flex items-center gap-1"
-              title="Inspect bedside ECG / Labs / Imaging twist"
+              class="text-[11px] text-amber-400 hover:text-amber-300 font-medium transition flex items-center gap-1"
             >
               <span>⚡</span>
               <span>Bedside Twist</span>
@@ -355,16 +374,16 @@
               id="reveal-clues-btn"
               class="text-[11px] text-zinc-400 hover:text-zinc-200 underline underline-offset-2 transition"
             >
-              Peek Missed Clues
+              Peek Clues
             </button>
           </div>
         </div>
 
-        <!-- Collapsible Peek Missed Clues Drawer (Hidden unless toggled) -->
-        <div id="gates-checklist-drawer" class="hidden pt-2 hairline-border-t space-y-1.5">
+        <!-- Peek Clues Checklist Drawer -->
+        <div id="gates-checklist-drawer" class="hidden pt-2 hairline-border-t space-y-2">
           <div class="flex items-center justify-between text-[11px] text-zinc-500">
-            <span>Tap any gate below to ask &amp; unlock immediately:</span>
-            <button onclick="fireSpamMacro('all_clinical')" class="text-emerald-400 hover:underline font-medium">Unlock All Clues</button>
+            <span>Tap any clue below to query immediately:</span>
+            <button onclick="fireSpamMacro('all_clinical')" class="text-emerald-400 hover:underline font-semibold">Unlock All Clues</button>
           </div>
           <div id="gates-checklist-container" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-1">
             <!-- Populated by JS -->
@@ -372,14 +391,14 @@
         </div>
       </div>
 
-      <!-- THE "SPAM QUESTIONS" INPUT BAR (Front & Center) -->
-      <div class="card-surface rounded-xl p-3 space-y-2.5">
+      <!-- THE BLITZ COMMAND BAR (Input & Rapid Sweep Macros) -->
+      <div class="card-surface rounded-xl p-3.5 space-y-2.5 shadow-lg">
         <div class="flex items-center gap-2">
           <button
             onclick="toggleMicrophoneRecord()"
             id="mic-record-btn"
-            class="w-9 h-9 rounded-lg bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-400 hover:text-zinc-100 flex items-center justify-center shrink-0 transition"
-            title="1-Tap Voice Recognition"
+            class="w-10 h-10 rounded-lg bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-400 hover:text-white flex items-center justify-center shrink-0 transition"
+            title="1-Tap Continuous Voice Recognition"
           >
             <i class="fa-solid fa-microphone text-xs" id="mic-icon"></i>
           </button>
@@ -387,34 +406,34 @@
           <input
             type="text"
             id="candidate-text-input"
-            placeholder="Spam questions or keywords (e.g. onset character fever travel meds)..."
-            class="flex-1 bg-[#090A0F] hairline-border rounded-lg px-3.5 py-2 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 transition"
+            placeholder="Ask anything or spam keywords: 'onset character fever travel meds'..."
+            class="flex-1 bg-[#090A10] hairline-border rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition"
           >
 
           <button
             onclick="sendCandidateMessage()"
-            class="px-3.5 py-2 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-medium text-xs shrink-0 transition"
+            class="px-4 py-2.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-xs shrink-0 transition"
           >
             Ask ↵
           </button>
         </div>
 
-        <!-- 5 Clean, Minimalist 1-Tap Sweep Pills -->
-        <div class="flex items-center justify-between gap-1.5 flex-wrap">
+        <!-- 5 Clean 1-Tap Sweep Macros -->
+        <div class="flex items-center justify-between gap-1.5 flex-wrap pt-0.5">
           <div class="flex flex-wrap items-center gap-1.5">
-            <button onclick="fireSpamMacro('socrates')" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-300 text-[11px] font-medium transition">
+            <button onclick="fireSpamMacro('socrates')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
               ⚡ SOCRATES
             </button>
-            <button onclick="fireSpamMacro('red_flags')" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-rose-500/40 text-zinc-300 text-[11px] font-medium transition">
+            <button onclick="fireSpamMacro('red_flags')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-rose-500/50 text-rose-300 text-[11px] font-medium transition">
               🚨 Red Flags
             </button>
-            <button onclick="fireSpamMacro('pmhx_meds')" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-300 text-[11px] font-medium transition">
+            <button onclick="fireSpamMacro('pmhx_meds')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
               💊 PMHx &amp; Meds
             </button>
-            <button onclick="fireSpamMacro('social_epi')" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-300 text-[11px] font-medium transition">
+            <button onclick="fireSpamMacro('social_epi')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
               🇸🇬 Social &amp; Epi
             </button>
-            <button onclick="fireSpamMacro('exam_vitals')" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-300 text-[11px] font-medium transition">
+            <button onclick="fireSpamMacro('exam_vitals')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
               🩺 Exam &amp; Vitals
             </button>
           </div>
@@ -425,18 +444,18 @@
         </div>
       </div>
 
-      <!-- INLINE CLINICAL TWIST (PERTURBATION) BANNER (Hidden until triggered) -->
-      <div id="inline-twist-banner" class="hidden card-surface rounded-xl p-4 border-l-2 border-l-amber-400 space-y-3">
+      <!-- INLINE BEDSIDE CLINICAL TWIST BANNER -->
+      <div id="inline-twist-banner" class="hidden card-surface rounded-xl p-4 border-l-2 border-l-amber-400 space-y-3 shadow-md">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <span class="text-[10px] font-mono uppercase tracking-wider text-amber-400">⚡ Bedside Clinical Twist</span>
-            <h3 id="twist-title" class="text-xs sm:text-sm font-semibold text-zinc-100 mt-0.5">Interim Bedside Result</h3>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-amber-400 font-semibold">⚡ Bedside Investigation Result</span>
+            <h3 id="twist-title" class="text-xs sm:text-sm font-bold text-zinc-100 mt-0.5">Interim Clinical Update</h3>
           </div>
-          <span id="twist-status-pill" class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300">Tap 1-Click Pivot</span>
+          <span id="twist-status-pill" class="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20">1-Tap Pivot</span>
         </div>
 
-        <div id="twist-findings-box" class="bg-[#090A0F] hairline-border rounded-lg p-3 font-mono text-[11px] text-zinc-300 space-y-1">
-          <!-- Findings injected by JS -->
+        <div id="twist-findings-box" class="bg-[#090A10] hairline-border rounded-lg p-3 font-mono text-[11px] text-zinc-300 space-y-1">
+          <!-- Populated by JS -->
         </div>
 
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1">
@@ -444,37 +463,37 @@
             How does this affect <strong id="twist-target-hypothesis" class="text-zinc-200">Primary Hypothesis</strong>?
           </span>
           <div class="flex items-center gap-1.5 shrink-0">
-            <button onclick="submitQuickTwistVote('supports')" id="twist-btn-supports" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-emerald-500/50 text-xs text-emerald-400 font-medium transition">
+            <button onclick="submitQuickTwistVote('supports')" id="twist-btn-supports" class="px-3 py-1 rounded-md bg-[#090A10] hairline-border hover:border-emerald-500/60 text-xs text-emerald-400 font-semibold transition">
               + Supports
             </button>
-            <button onclick="submitQuickTwistVote('refutes')" id="twist-btn-refutes" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-rose-500/50 text-xs text-rose-400 font-medium transition">
+            <button onclick="submitQuickTwistVote('refutes')" id="twist-btn-refutes" class="px-3 py-1 rounded-md bg-[#090A10] hairline-border hover:border-rose-500/60 text-xs text-rose-400 font-semibold transition">
               – Refutes
             </button>
-            <button onclick="submitQuickTwistVote('neutral')" id="twist-btn-neutral" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-zinc-600 text-xs text-zinc-400 font-medium transition">
+            <button onclick="submitQuickTwistVote('neutral')" id="twist-btn-neutral" class="px-3 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-xs text-zinc-400 font-semibold transition">
               0 Neutral
             </button>
           </div>
         </div>
 
         <div id="twist-rationale-box" class="hidden pt-2 hairline-border-t text-xs text-zinc-400 leading-relaxed">
-          <!-- Shown after 1-click vote -->
+          <!-- Rationale shown after vote -->
         </div>
       </div>
 
-      <!-- CLEAN SCANNABLE FINDINGS STREAM -->
+      <!-- FINDINGS STREAM -->
       <div id="chat-messages" class="space-y-2.5">
-        <!-- Positive findings (✓) and Pertinent negatives (–) stream here -->
+        <!-- Scannable Findings Cards stream here -->
       </div>
 
       <!-- BOTTOM STICKY ACTION BAR -->
       <div class="sticky bottom-4 pt-2">
-        <div class="card-surface rounded-xl px-4 py-3 flex items-center justify-between gap-3 shadow-xl bg-[#12141C]/95 backdrop-blur-md">
+        <div class="card-surface rounded-xl px-4 py-3 flex items-center justify-between gap-3 shadow-2xl bg-[#11131B]/95 backdrop-blur-md">
           <div class="text-xs text-zinc-400">
-            <span id="bottom-bar-summary">Ask questions or tap sweep pills above</span>
+            <span id="bottom-bar-summary">Target: 40s History • 25s Red Flags • 25s Dx &amp; Plan</span>
           </div>
           <button
             onclick="openDiagnosisAndVivaStep()"
-            class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs transition flex items-center gap-1.5 shrink-0"
+            class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs transition flex items-center gap-1.5 shrink-0 shadow-sm"
           >
             <span>Ready to Diagnose &amp; Manage</span>
             <span>→</span>
@@ -485,80 +504,78 @@
     </section>
 
     <!-- ========================================================= -->
-    <!-- VIEW 3: CLEAN DIAGNOSIS & VIVA STEP (Takes 20 seconds)    -->
+    <!-- VIEW 3: 20-SECOND DIAGNOSIS & MANAGEMENT SYNTHESIS        -->
     <!-- ========================================================= -->
     <section id="viva-view" class="hidden max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-      <div class="card-surface rounded-xl p-5 sm:p-6 space-y-5">
+      <div class="card-surface rounded-xl p-5 sm:p-6 space-y-5 shadow-xl">
         <!-- Top Row -->
         <div class="flex items-center justify-between gap-2 hairline-border-b pb-3.5">
           <div>
-            <span class="text-[11px] font-mono uppercase tracking-wider text-zinc-500">Final Step • 20s Synthesis</span>
-            <h2 class="text-base sm:text-lg font-semibold text-zinc-100 mt-0.5">Diagnosis &amp; Immediate Management</h2>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-semibold">Final Step • 20s Synthesis</span>
+            <h2 class="text-base sm:text-lg font-bold text-white mt-0.5">Diagnosis &amp; Immediate Management</h2>
           </div>
-          <button onclick="showView('consultation-view')" class="text-xs text-zinc-400 hover:text-zinc-200 transition">
+          <button onclick="showView('consultation-view')" class="text-xs text-zinc-400 hover:text-white transition">
             ← Back to History
           </button>
         </div>
 
-        <!-- Input 1: Top Diagnosis / Differentials -->
+        <!-- Input 1: Working Diagnosis -->
         <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <label for="dx-input" class="text-xs font-medium text-zinc-300">1. Your Top Diagnosis &amp; Key Differentials</label>
-            <span class="text-[11px] text-zinc-500">Tap chips or type</span>
+            <label for="dx-input" class="text-xs font-semibold text-zinc-200">1. Top Diagnosis &amp; Key Differentials</label>
+            <span class="text-[11px] text-zinc-500">Tap suggestions or type</span>
           </div>
           <input
             type="text"
             id="dx-input"
             placeholder="e.g. Severe Dengue Shock Syndrome; differentials: Melioidosis, Sepsis..."
-            class="w-full bg-[#090A0F] hairline-border rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 transition"
+            class="w-full bg-[#090A10] hairline-border rounded-lg px-3.5 py-2.5 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition"
           >
-          <!-- Quick-Tap Diagnosis Suggestion Chips -->
           <div id="dx-suggestion-chips" class="flex flex-wrap gap-1.5 pt-0.5">
             <!-- Populated by JS -->
           </div>
         </div>
 
-        <!-- Input 2: Immediate Investigations & Management Plan -->
+        <!-- Input 2: Investigations & Management -->
         <div class="space-y-2">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <label for="viva-answer-input" class="text-xs font-medium text-zinc-300">2. Immediate Investigations &amp; Management Plan</label>
+            <label for="viva-answer-input" class="text-xs font-semibold text-zinc-200">2. Immediate Investigations &amp; Management Plan</label>
             <div class="flex items-center gap-2">
               <button
                 type="button"
                 onclick="toggleVivaPromptsHelper()"
                 class="text-[11px] text-zinc-400 hover:text-zinc-200 underline underline-offset-2 transition"
               >
-                Show Examiner Prompts
+                Examiner Prompts
               </button>
               <button
                 type="button"
                 onclick="autoFillModelPlan()"
                 class="px-2 py-0.5 rounded bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/25 text-[11px] font-medium transition"
               >
-                ⚡ Auto-Fill Model Plan (Study Mode)
+                ⚡ Auto-Fill Model Plan
               </button>
             </div>
           </div>
 
-          <!-- Optional Collapsible Examiner Prompts Helper -->
-          <div id="viva-prompts-helper" class="hidden bg-[#090A0F] hairline-border rounded-lg p-3 space-y-2 text-xs text-zinc-400">
+          <div id="viva-prompts-helper" class="hidden bg-[#090A10] hairline-border rounded-lg p-3 space-y-2 text-xs text-zinc-400">
             <!-- Populated by JS -->
           </div>
 
           <textarea
             id="viva-answer-input"
             rows="4"
-            placeholder="Key bedside/definitive investigations & immediate resuscitation/treatment..."
-            class="w-full bg-[#090A0F] hairline-border rounded-lg p-3.5 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-600 transition"
+            placeholder="Key bedside investigations, labs, imaging, and acute resuscitation/management..."
+            class="w-full bg-[#090A10] hairline-border rounded-lg p-3.5 text-xs sm:text-sm text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:border-zinc-500 transition"
           ></textarea>
         </div>
 
-        <!-- Submit Action -->
-        <div class="pt-2 flex items-center justify-end gap-3">
+        <!-- Grade Action -->
+        <div class="pt-2 flex items-center justify-end">
           <button
             onclick="gradeStationNow()"
-            class="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs sm:text-sm transition"
+            class="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs sm:text-sm transition shadow-sm"
           >
             Grade Station ↵
           </button>
@@ -568,86 +585,84 @@
     </section>
 
     <!-- ========================================================= -->
-    <!-- VIEW 4: MINIMALIST SCORECARD & TEXTBOOK APPROACH SHEET    -->
+    <!-- VIEW 4: MINIMALIST SCORECARD & STUDY REFERENCE            -->
     <!-- ========================================================= -->
     <section id="scorecard-view" class="hidden max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-      <!-- Card 1: Score Summary & Red Flags Audit -->
-      <div class="card-surface print-card rounded-xl p-5 sm:p-6 space-y-5">
-
-        <!-- True Diagnosis & Overall Score Header -->
+      <!-- Performance Summary Card -->
+      <div class="card-surface print-card rounded-xl p-5 sm:p-6 space-y-5 shadow-xl">
         <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 hairline-border-b pb-4">
           <div class="space-y-1">
             <div class="flex items-center gap-2">
-              <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-400">True Diagnosis Revealed</span>
+              <span class="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-semibold">Station Complete</span>
               <span id="scorecard-specialty-tag" class="text-[11px] text-zinc-500">• Specialty</span>
             </div>
-            <h2 id="card-case-title" class="text-lg sm:text-xl font-bold text-zinc-100">Diagnosis Title</h2>
+            <h2 id="card-case-title" class="text-lg sm:text-xl font-bold text-white">Diagnosis Title</h2>
             <p id="card-primary-dx" class="text-xs text-zinc-400"></p>
           </div>
 
           <div class="flex sm:flex-col items-baseline sm:items-end justify-between gap-2 shrink-0">
             <div class="flex items-baseline gap-2">
-              <span id="card-score-pct" class="font-mono text-2xl sm:text-3xl font-bold text-emerald-400">92%</span>
-              <span id="card-grade-badge" class="text-xs font-medium px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300">Distinction</span>
+              <span id="card-score-pct" class="font-mono text-3xl sm:text-4xl font-bold text-emerald-400">92%</span>
+              <span id="card-grade-badge" class="text-xs font-semibold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Distinction</span>
             </div>
             <div id="card-time-comparison" class="font-mono text-[11px] text-zinc-500">
-              Time: 01:12 / 01:30 target
+              Time: 01:14 / 01:30 target
             </div>
           </div>
         </div>
 
-        <!-- 4 Clean Metric Pills -->
+        <!-- 4 Metric Score Pillars -->
         <div id="card-metrics-grid" class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          <!-- Populated by JS: Red Flags (40%), History (20%), Diagnosis & Twist (25%), Management (15%) -->
+          <!-- Populated by JS -->
         </div>
 
-        <!-- Missed vs. Cleared Red Flags -->
+        <!-- Red Flags Audit -->
         <div class="space-y-2">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-zinc-400">Red Flags &amp; Safety Audit</h3>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400">Red Flags &amp; Patient Safety Audit</h3>
           <div id="card-redflags-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
             <!-- Populated by JS -->
           </div>
         </div>
 
-        <!-- Cognitive Traps Alert (if any triggered) -->
+        <!-- Cognitive Traps Section (if any triggered) -->
         <div id="card-traps-section" class="hidden space-y-2 pt-2 hairline-border-t">
-          <h3 class="text-xs font-semibold uppercase tracking-wider text-amber-400">Clinical Pitfalls to Watch</h3>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400">Clinical Pitfalls</h3>
           <div id="card-traps-container" class="space-y-1.5 text-xs"></div>
         </div>
       </div>
 
-      <!-- Card 2: Textbook Clinical Approach Summary Card (Inspired by OSCE Study Reference) -->
-      <div class="card-surface print-card rounded-xl p-5 sm:p-6 space-y-4">
+      <!-- Textbook Approach Study Sheet -->
+      <div class="card-surface print-card rounded-xl p-5 sm:p-6 space-y-4 shadow-xl">
         <div class="flex items-center justify-between hairline-border-b pb-3">
           <div>
-            <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500">Study Reference Card</span>
-            <h3 class="text-sm sm:text-base font-semibold text-zinc-100">Clinical Approach &amp; Gold-Standard Marking Key</h3>
+            <span class="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-semibold">Finals Reference Card</span>
+            <h3 class="text-sm sm:text-base font-bold text-white">Clinical Approach &amp; Gold-Standard Marking Key</h3>
           </div>
-          <span id="approach-source-badge" class="text-[11px] font-mono text-zinc-400 bg-[#090A0F] hairline-border px-2.5 py-1 rounded">
-            Finals Handbook
+          <span id="approach-source-badge" class="text-[11px] font-mono text-zinc-400 bg-[#090A10] hairline-border px-2.5 py-1 rounded">
+            Handbook
           </span>
         </div>
 
         <div id="card-approach-sheet" class="space-y-4 text-xs leading-relaxed">
-          <!-- Populated by JS: Textbook Framework, Diagnostic Features, Differentials, Investigations & Management -->
+          <!-- Populated by JS -->
         </div>
       </div>
 
-      <!-- Footer Actions (Hidden when printing) -->
+      <!-- Footer Action Buttons -->
       <div class="no-print flex flex-wrap items-center justify-between gap-3 pt-1">
-        <button onclick="showView('cases-view')" class="px-4 py-2 rounded-lg card-surface hover:border-zinc-700 text-xs font-medium text-zinc-300 transition">
-          ← Case Library
+        <button onclick="showView('cases-view')" class="px-4 py-2 rounded-lg card-surface hover:border-zinc-600 text-xs font-medium text-zinc-300 transition">
+          ← Station Library
         </button>
 
         <div class="flex flex-wrap items-center gap-2">
-          <button onclick="copyMarkdownReport()" class="px-3.5 py-2 rounded-lg card-surface hover:border-zinc-700 text-xs font-medium text-zinc-300 transition">
-            📋 Copy Summary
+          <button onclick="copyMarkdownReport()" class="px-3.5 py-2 rounded-lg card-surface hover:border-zinc-600 text-xs font-medium text-zinc-300 transition">
+            📋 Copy Report
           </button>
-          <button onclick="window.print()" class="px-3.5 py-2 rounded-lg card-surface hover:border-zinc-700 text-xs font-medium text-zinc-300 transition">
-            🖨️ Print / Save PDF Study Card
+          <button onclick="window.print()" class="px-3.5 py-2 rounded-lg card-surface hover:border-zinc-600 text-xs font-medium text-zinc-300 transition">
+            🖨️ Print / Save PDF
           </button>
-          <button onclick="startRandomCase()" class="px-4 py-2 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-semibold text-xs transition">
+          <button onclick="startRandomCase()" class="px-4 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs transition shadow-sm">
             🎲 Next Random Case →
           </button>
         </div>

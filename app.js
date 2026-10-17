@@ -361,6 +361,40 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     });
   }
+
+  // Hotkey support: '/' focuses search, 'Escape' dismisses overlays, 'Ctrl+Enter' grades station
+  document.addEventListener("keydown", (e) => {
+    const activeEl = document.activeElement;
+    const isInputActive = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable);
+
+    if (e.key === "/" && !isInputActive) {
+      const casesView = document.getElementById("cases-view");
+      const searchInput = document.getElementById("station-search-input") || document.getElementById("case-search-input");
+      if (casesView && !casesView.classList.contains("hidden") && searchInput) {
+        e.preventDefault();
+        searchInput.focus();
+        searchInput.select();
+      }
+    } else if (e.key === "Escape") {
+      const guidePop = document.getElementById("time-guide-popover");
+      if (guidePop && !guidePop.classList.contains("hidden")) {
+        guidePop.classList.add("hidden");
+      }
+      const approachDrawer = document.getElementById("symptom-approach-drawer");
+      if (approachDrawer && !approachDrawer.classList.contains("hidden")) {
+        approachDrawer.classList.add("hidden");
+      }
+      if (activeEl && (activeEl.id === "station-search-input" || activeEl.id === "case-search-input")) {
+        activeEl.blur();
+      }
+    } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+      const vivaView = document.getElementById("viva-view");
+      if (vivaView && !vivaView.classList.contains("hidden")) {
+        e.preventDefault();
+        gradeStationNow();
+      }
+    }
+  });
 });
 
 function showView(viewId) {

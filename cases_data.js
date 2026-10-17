@@ -66754,7 +66754,7 @@ const CASES_DATA = [
     "target_seconds": 90,
     "time_breakdown": "40s History Spam • 25s Bedside Twist • 25s Dx & Plan",
     "source": "Harrison's / Kumar & Clark / Oxford OSCE Bank",
-    "patient_name": "Baby Noah Tan",
+    "patient_name": "Baby Lucas Tan",
     "age": 0,
     "gender": "Male",
     "occupation": "4-Month-Old Infant (Ex-33 Week Preterm)",
@@ -66769,7 +66769,7 @@ const CASES_DATA = [
       "Oxygen Saturation": "90% on room air",
       "Temperature": "37.8°C"
     },
-    "background_context": "BLITZ MODE: Rapidly evaluate Baby Noah Tan (0yo Male) presenting with 3 days of coryza progressing to rapid breathing, chest wall recession, widespread wheeze/crackles, and taking less than half of his milk feeds. Unlock critical history and red flags, interpret interim bedside investigations, and formulate an acute management plan.",
+    "background_context": "BLITZ MODE: Rapidly evaluate Baby Lucas Tan (0yo Male) presenting with 3 days of coryza progressing to rapid breathing, chest wall recession, widespread wheeze/crackles, and taking less than half of his milk feeds. Unlock critical history and red flags, interpret interim bedside investigations, and formulate an acute management plan.",
     "baseline_disclosure_gates": [
       {
         "id": "hpi_socrates",

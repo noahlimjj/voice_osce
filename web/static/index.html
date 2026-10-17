@@ -75,6 +75,36 @@
     .mic-listening {
       animation: pulse-subtle 1.2s infinite ease-in-out;
     }
+    /* Small "SG" badge (flag emoji renders as plain letters on Windows) */
+    .sg-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      font: 600 9px/1 'JetBrains Mono', monospace; letter-spacing: 0.02em;
+      padding: 2px 4px; border-radius: 4px; vertical-align: 1px;
+      color: #FCA5A5; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+    .tab-count {
+      font: 500 10px/1 'JetBrains Mono', monospace; opacity: 0.55; margin-left: 2px;
+    }
+    /* Visible keyboard focus everywhere */
+    :focus { outline: none; }
+    :focus-visible {
+      outline: 2px solid rgba(52, 211, 153, 0.75);
+      outline-offset: 2px;
+      border-radius: 8px;
+    }
+    /* Pace bar under the station top bar */
+    #pace-bar-fill { transition: width 1s linear, background-color 0.3s ease; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { scrollbar-width: none; }
+    /* Comfortable tap targets on phones */
+    @media (max-width: 640px) {
+      #consultation-view button, #viva-view button, #scorecard-view button, .filter-tab {
+        min-height: 36px;
+      }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+    }
     ::-webkit-scrollbar { width: 5px; height: 5px; }
     ::-webkit-scrollbar-track { background: #090A0F; }
     ::-webkit-scrollbar-thumb { background: #27272A; border-radius: 3px; }
@@ -131,7 +161,7 @@
         <button onclick="toggleTimeGuidePopover()" id="time-guide-btn" class="px-2.5 py-1.5 rounded-lg card-surface hover:border-zinc-700 text-xs text-zinc-300 font-mono flex items-center gap-1.5 transition" title="How long should each case take? Click for breakdown">
           <span>⏱️</span>
           <span class="hidden md:inline">Target:</span>
-          <span class="text-emerald-400 font-medium">60s–120s / case</span>
+          <span class="text-emerald-400 font-medium hidden sm:inline whitespace-nowrap">60s–120s / case</span>
         </button>
 
         <button onclick="toggleSymptomApproachDrawer()" id="approach-drawer-btn" class="px-2.5 py-1.5 rounded-lg card-surface hover:border-zinc-700 text-xs text-zinc-300 flex items-center gap-1.5 transition" title="Open Symptom Approach Generator (from OSCE repo)">
@@ -139,9 +169,9 @@
           <span class="hidden sm:inline">Approach Guide</span>
         </button>
 
-        <button onclick="startRandomCase()" class="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-medium text-xs flex items-center gap-1.5 transition shadow-sm">
+        <button onclick="startRandomCase()" class="px-3 py-1.5 rounded-lg bg-zinc-100 hover:bg-white text-zinc-950 font-medium text-xs flex items-center gap-1.5 transition shadow-sm whitespace-nowrap">
           <span>🎲</span>
-          <span>Random Case</span>
+          <span><span class="hidden sm:inline">Random </span>Case</span>
         </button>
       </div>
     </div>
@@ -229,7 +259,7 @@
           All
         </button>
         <button onclick="filterCases('sg_classics')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="sg_classics">
-          🇸🇬 SG Classics
+          <span class="sg-badge">SG</span> SG Classics
         </button>
         <button onclick="filterCases('chest_pain')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="chest_pain">
           Chest Pain
@@ -276,14 +306,15 @@
     <section id="consultation-view" class="hidden max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
 
       <!-- Compact Station Top Bar -->
-      <div class="card-surface rounded-xl px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-2">
+      <div class="card-surface rounded-xl overflow-hidden">
+      <div class="px-3.5 py-2.5 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <button onclick="exitStationToLibrary()" class="text-xs text-zinc-400 hover:text-zinc-100 font-medium flex items-center gap-1.5 transition">
           <span>←</span>
           <span>Exit</span>
         </button>
 
-        <!-- Patient Demographic + Vitals Monospace Strip -->
-        <div id="consult-vitals-strip" class="font-mono text-[11px] text-zinc-300 truncate max-w-md sm:max-w-lg">
+        <!-- Patient Demographic + Vitals Monospace Strip (wraps on phones instead of truncating) -->
+        <div id="consult-vitals-strip" class="order-last sm:order-none basis-full sm:basis-auto sm:flex-1 min-w-0 font-mono text-[11px] text-zinc-300 leading-relaxed sm:truncate">
           <!-- e.g. 19M NSF • BP 96/82 • HR 118 • RR 24 • T 36.9°C • SpO2 98% -->
         </div>
 
@@ -308,6 +339,11 @@
             <span id="voice-mode-label" class="hidden sm:inline">Silent</span>
           </button>
         </div>
+      </div>
+      <!-- Pace bar: fills toward the target time, turns amber near it and rose when over -->
+      <div class="h-[3px] bg-white/5" role="progressbar" aria-label="Time used against target" id="pace-bar">
+        <div id="pace-bar-fill" class="h-full bg-emerald-400/80" style="width:0%"></div>
+      </div>
       </div>
 
       <!-- Patient Opening Card + Subtle Progress Strip -->
@@ -412,7 +448,7 @@
               💊 PMHx &amp; Meds
             </button>
             <button onclick="fireSpamMacro('social_epi')" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-300 text-[11px] font-medium transition">
-              🇸🇬 Social &amp; Epi
+              🌏 Social &amp; Epi
             </button>
             <button onclick="fireSpamMacro('exam_vitals')" class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-300 text-[11px] font-medium transition">
               🩺 Exam &amp; Vitals
@@ -462,7 +498,7 @@
       </div>
 
       <!-- CLEAN SCANNABLE FINDINGS STREAM -->
-      <div id="chat-messages" class="space-y-2.5">
+      <div id="chat-messages" class="space-y-2.5 pb-20">
         <!-- Positive findings (✓) and Pertinent negatives (–) stream here -->
       </div>
 

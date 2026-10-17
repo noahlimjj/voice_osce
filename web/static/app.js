@@ -526,12 +526,18 @@ function formatTargetBadge(sec) {
 }
 
 async function loadCases() {
-  const rawMap = Object.assign({}, FALLBACK_SG_CASES, window.VOICE_OSCE_CASES || {});
   ALL_CASES_MAP = {};
-
-  Object.entries(rawMap).forEach(([id, c]) => {
-    ALL_CASES_MAP[id] = JSON.parse(JSON.stringify(c));
-  });
+  // cases_data.js may export an array or a map; always key by the case's own id,
+  // otherwise array indices ("0", "1"...) become keys and cards can't be opened
+  const addCases = (source) => {
+    Object.entries(source || {}).forEach(([key, c]) => {
+      if (!c) return;
+      const id = c.case_id || c.id || key;
+      ALL_CASES_MAP[id] = JSON.parse(JSON.stringify(c));
+    });
+  };
+  addCases(FALLBACK_SG_CASES);
+  addCases(window.VOICE_OSCE_CASES);
 
   try {
     const res = await fetch("/api/cases");
@@ -591,7 +597,7 @@ function updateFilterTabCounts() {
     const count = currentCases.filter(c => isCaseMatchingFilter(c, cat)).length;
     const baseLabels = {
       all: "All",
-      sg_classics: "🇸🇬 SG Classics",
+      sg_classics: "SG Classics",
       chest_pain: "Chest Pain",
       abdominal_pain: "Abdominal Pain",
       fever: "Fever",
@@ -604,7 +610,8 @@ function updateFilterTabCounts() {
       ent_eye: "ENT & Eye"
     };
     const label = baseLabels[cat] || cat;
-    tab.innerText = count > 0 ? `${label} (${count})` : label;
+    const badge = cat === "sg_classics" ? `<span class="sg-badge">SG</span> ` : "";
+    tab.innerHTML = `${badge}${escapeHtml(label)}${count > 0 ? ` <span class="tab-count">${count}</span>` : ""}`;
   });
 }
 
@@ -699,7 +706,7 @@ function renderCasesGrid(cases) {
     card.onclick = () => launchInstantBlitz(c.id);
 
     const topTag = c.isSgClassic
-      ? `<span class="text-[11px] font-medium text-zinc-300">🇸🇬 SG • ${escapeHtml(c.clusterLabel)}</span>`
+      ? `<span class="text-[11px] font-medium text-zinc-300"><span class="sg-badge">SG</span> ${escapeHtml(c.clusterLabel)}</span>`
       : `<span class="text-[11px] font-medium text-zinc-400">${escapeHtml(c.shortSpecialty)} • ${escapeHtml(c.clusterLabel)}</span>`;
 
     const displayTitle = isBlindMode ? c.blindPrompt : c.title;
@@ -869,6 +876,15 @@ function updateTimerDisplay() {
   if (!timerEl) return;
 
   const remaining = targetSeconds - elapsedSeconds;
+
+  const fill = document.getElementById("pace-bar-fill");
+  if (fill) {
+    const pct = Math.min(100, (elapsedSeconds / Math.max(1, targetSeconds)) * 100);
+    fill.style.width = `${pct}%`;
+    fill.className = "h-full " + (remaining < 0 ? "bg-rose-400/90" : remaining <= 20 ? "bg-amber-400/90" : "bg-emerald-400/80");
+    fill.parentElement?.setAttribute("aria-valuenow", String(Math.round(pct)));
+  }
+
   if (remaining >= 0) {
     timerEl.innerText = formatSecondsMMSS(remaining);
     if (remaining <= 20) {
@@ -991,7 +1007,7 @@ function fireSpamMacro(macroType) {
     macroQuery = "past medical history diabetes hypertension surgery medications blood thinners allergies compliance";
     forcedCategories = ["past_history", "drug_history"];
   } else if (macroType === "social_epi") {
-    macroTitle = "🇸🇬 Social & Epi";
+    macroTitle = "Social & Epi";
     macroQuery = "occupation army camp tekong travel hawker food smoking alcohol family history";
     forcedCategories = ["social"];
   } else if (macroType === "exam_vitals") {
@@ -1044,8 +1060,28 @@ function executeBlitzTurn(queryText, forcedCategories = null, macroBadge = null)
   }
 }
 
+// Clinical acronyms that should stay upper-case (or keep their conventional casing)
+const GATE_TITLE_TERMS = {
+  pmhx: "PMHx", pshx: "PSHx", dhx: "DHx", shx: "SHx", fhx: "FHx", hpi: "HPI", ice: "ICE",
+  socrates: "SOCRATES", copd: "COPD", co2: "CO₂", o2: "O₂", ssri: "SSRI", nsaid: "NSAID", nsaids: "NSAIDs",
+  ocp: "OCP", dvt: "DVT", pe: "PE", ecg: "ECG", ct: "CT", lp: "LP", lmp: "LMP", pid: "PID", uti: "UTI",
+  gi: "GI", ent: "ENT", npc: "NPC", dka: "DKA", hhs: "HHS", tb: "TB", hiv: "HIV", std: "STD", sti: "STI",
+  bp: "BP", hr: "HR", rr: "RR", gcs: "GCS", ckd: "CKD", ihd: "IHD", af: "AF", mi: "MI", acs: "ACS",
+  ibd: "IBD", ibs: "IBS", sle: "SLE", ra: "RA", ns: "NS", nsf: "NSF", ed: "ED", icu: "ICU",
+};
+
 function formatGateTitle(key) {
-  return String(key || "").replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+  // "rf_co2_narcosis" -> "CO₂ narcosis"; "pmhx_drugs_allergies" -> "PMHx, drugs & allergies"
+  const words = String(key || "").toLowerCase().split(/_+/).filter(Boolean);
+  if (words[0] === "rf" || (words[0] === "red" && words[1] === "flag")) {
+    words.splice(0, words[0] === "rf" ? 1 : 2); // the red-flag tag already says so
+  }
+  if (words.length === 0) return "Finding";
+  const out = words.map((w, i) => GATE_TITLE_TERMS[w] || (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w));
+  if (out.length >= 3 && words[0] === "pmhx") {
+    return `${out[0]}, ${out.slice(1, -1).join(", ")} & ${out[out.length - 1]}`;
+  }
+  return out.join(" ");
 }
 
 function appendMinimalistFindingCard(result, queryText, macroBadge) {
@@ -1130,15 +1166,30 @@ function triggerInlineTwistBanner() {
     ).join("");
   }
 
-  const primaryHyp = (activeCase.differentials && activeCase.differentials[0]?.name) ||
-    Object.keys(pert.expected_shifts || {})[0] ||
-    activeCase.title;
-  const shortHyp = String(primaryHyp).split("(")[0].trim();
+  // In Blind Mode don't name the diagnosis before the candidate commits; it is revealed after the vote
   const targetEl = document.getElementById("twist-target-hypothesis");
-  if (targetEl) targetEl.innerText = shortHyp;
+  if (targetEl) targetEl.innerText = isBlindMode ? "your leading diagnosis" : twistHypothesisLabel();
+
+  const statusPill = document.getElementById("twist-status-pill");
+  if (statusPill) {
+    statusPill.innerText = "Vote below";
+    statusPill.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 whitespace-nowrap";
+  }
 
   document.getElementById("twist-rationale-box")?.classList.add("hidden");
   banner.classList.remove("hidden");
+}
+
+// The hypothesis shown in the banner must be the same one the vote is scored against
+function twistHypothesisKey() {
+  const pert = activeCase?.perturbation || {};
+  return Object.keys(pert.expected_shifts || {})[0] ||
+    (activeCase?.differentials && activeCase.differentials[0]?.name) ||
+    activeCase?.title || "";
+}
+
+function twistHypothesisLabel() {
+  return String(twistHypothesisKey()).split("(")[0].trim();
 }
 
 function submitQuickTwistVote(voteType) {
@@ -1146,7 +1197,9 @@ function submitQuickTwistVote(voteType) {
   clientSession.perturbationVoted = true;
 
   const pert = activeCase.perturbation;
-  const primaryHyp = Object.keys(pert.expected_shifts || {})[0] || activeCase.title;
+  const primaryHyp = twistHypothesisKey();
+  const targetEl = document.getElementById("twist-target-hypothesis");
+  if (targetEl) targetEl.innerText = twistHypothesisLabel();
   const expectedVal = (pert.expected_shifts && pert.expected_shifts[primaryHyp]) ?? 2;
 
   const isCorrect =
@@ -1161,8 +1214,8 @@ function submitQuickTwistVote(voteType) {
   if (statusPill) {
     statusPill.innerText = isCorrect ? "✓ Concordant (+2)" : "Reviewed";
     statusPill.className = isCorrect
-      ? "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400"
-      : "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300";
+      ? "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 whitespace-nowrap"
+      : "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 whitespace-nowrap";
   }
 
   const rationaleBox = document.getElementById("twist-rationale-box");

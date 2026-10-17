@@ -369,24 +369,16 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     if (e.key === "/" && !isInputActive) {
       const casesView = document.getElementById("cases-view");
-      const searchInput = document.getElementById("station-search-input") || document.getElementById("case-search-input");
+      const searchInput = document.getElementById("station-search-input");
       if (casesView && !casesView.classList.contains("hidden") && searchInput) {
         e.preventDefault();
         searchInput.focus();
         searchInput.select();
       }
     } else if (e.key === "Escape") {
-      const guidePop = document.getElementById("time-guide-popover");
-      if (guidePop && !guidePop.classList.contains("hidden")) {
-        guidePop.classList.add("hidden");
-      }
-      const approachDrawer = document.getElementById("symptom-approach-drawer");
-      if (approachDrawer && !approachDrawer.classList.contains("hidden")) {
-        approachDrawer.classList.add("hidden");
-      }
-      if (activeEl && (activeEl.id === "station-search-input" || activeEl.id === "case-search-input")) {
-        activeEl.blur();
-      }
+      document.getElementById("time-guide-popover")?.classList.add("hidden");
+      document.getElementById("symptom-approach-drawer")?.classList.add("hidden");
+      if (activeEl && activeEl.id === "station-search-input") activeEl.blur();
     } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       const vivaView = document.getElementById("viva-view");
       if (vivaView && !vivaView.classList.contains("hidden")) {
@@ -414,6 +406,7 @@ function exitStationToLibrary() {
   stopVoiceRecognition();
   if (window.speechSynthesis) window.speechSynthesis.cancel();
   showView("cases-view");
+  renderCasesGrid(getFilteredCases());
 }
 
 // -------------------------------------------------------------
@@ -449,7 +442,7 @@ function renderSymptomApproachDrawer(clusterKey) {
       const active = key === activeApproachCluster;
       const cls = active
         ? "px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-100 text-zinc-950 transition"
-        : "px-2.5 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-[#090A0F] hairline-border transition";
+        : "px-2.5 py-1 rounded-md text-xs font-medium text-zinc-400 hover:text-zinc-200 bg-[#090A10] hairline-border transition";
       return `<button onclick="renderSymptomApproachDrawer('${escapeHtml(key)}')" class="${cls}">${escapeHtml(item.label || key)}</button>`;
     }).join("");
   }
@@ -560,12 +553,18 @@ function formatTargetBadge(sec) {
 }
 
 async function loadCases() {
-  const rawMap = Object.assign({}, FALLBACK_SG_CASES, window.VOICE_OSCE_CASES || {});
   ALL_CASES_MAP = {};
-
-  Object.entries(rawMap).forEach(([id, c]) => {
-    ALL_CASES_MAP[id] = JSON.parse(JSON.stringify(c));
-  });
+  // cases_data.js may export an array or a map; always key by the case's own id,
+  // otherwise array indices ("0", "1"...) become keys and cards can't be opened
+  const addCases = (source) => {
+    Object.entries(source || {}).forEach(([key, c]) => {
+      if (!c) return;
+      const id = c.case_id || c.id || key;
+      ALL_CASES_MAP[id] = JSON.parse(JSON.stringify(c));
+    });
+  };
+  addCases(FALLBACK_SG_CASES);
+  addCases(window.VOICE_OSCE_CASES);
 
   try {
     const res = await fetch("/api/cases");
@@ -619,13 +618,76 @@ async function loadCases() {
   renderCasesGrid(getFilteredCases());
 }
 
+// -------------------------------------------------------------
+// LOCAL PROGRESS (per-browser best scores; never required to work)
+// -------------------------------------------------------------
+const PROGRESS_KEY = "osceblitz.progress.v1";
+
+function loadProgress() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PROGRESS_KEY) || "{}");
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function recordProgress(caseId, score, seconds) {
+  const progress = loadProgress();
+  const prev = progress[caseId];
+  const isNewBest = !prev || score > prev.best;
+  progress[caseId] = {
+    best: prev ? Math.max(prev.best, score) : score,
+    last: score,
+    attempts: (prev?.attempts || 0) + 1,
+    bestTime: prev?.bestTime ? Math.min(prev.bestTime, seconds) : seconds,
+    ts: Date.now()
+  };
+  try {
+    localStorage.setItem(PROGRESS_KEY, JSON.stringify(progress));
+  } catch (e) { /* private mode / storage blocked: progress just isn't kept */ }
+  return { prev, isNewBest };
+}
+
+function scoreTone(score) {
+  if (score >= 85) return "text-emerald-300 bg-emerald-500/10 border-emerald-500/25";
+  if (score >= 65) return "text-sky-300 bg-sky-500/10 border-sky-500/25";
+  if (score >= 50) return "text-amber-300 bg-amber-500/10 border-amber-500/25";
+  return "text-rose-300 bg-rose-500/10 border-rose-500/25";
+}
+
+function renderProgressSummary() {
+  const el = document.getElementById("progress-summary");
+  if (!el) return;
+  const progress = loadProgress();
+  const done = currentCases.filter(c => progress[c.id]);
+  if (done.length === 0) {
+    el.innerHTML = `<span class="text-zinc-500">No stations attempted yet. Pick any card<span class="hidden sm:inline">, or press <kbd class="kbd">/</kbd> to search</span>.</span>`;
+    return;
+  }
+  const avg = Math.round(done.reduce((acc, c) => acc + progress[c.id].best, 0) / done.length);
+  const weak = done.filter(c => progress[c.id].best < 65).length;
+  const pct = Math.round((done.length / Math.max(1, currentCases.length)) * 100);
+  el.innerHTML = `
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div class="w-24 sm:w-32 h-1.5 rounded-full bg-white/5 overflow-hidden shrink-0" role="progressbar" aria-label="Stations attempted" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
+        <div class="h-full bg-emerald-400/80" style="width:${pct}%"></div>
+      </div>
+      <span class="text-zinc-300"><span class="font-mono text-zinc-100">${done.length}</span><span class="text-zinc-500">/${currentCases.length}</span> attempted</span>
+    </div>
+    <span class="text-zinc-600">·</span>
+    <span class="text-zinc-400">Avg best <span class="font-mono text-zinc-100">${avg}%</span></span>
+    ${weak > 0 ? `<span class="text-zinc-600">·</span><span class="text-amber-300/90">${weak} to revisit</span>` : ""}
+  `;
+}
+
 function updateFilterTabCounts() {
   document.querySelectorAll(".filter-tab").forEach(tab => {
     const cat = tab.dataset.specialty;
     const count = currentCases.filter(c => isCaseMatchingFilter(c, cat)).length;
     const baseLabels = {
       all: "All",
-      sg_classics: "🇸🇬 SG Classics",
+      sg_classics: "SG Classics",
       chest_pain: "Chest Pain",
       abdominal_pain: "Abdominal Pain",
       fever: "Fever",
@@ -638,7 +700,8 @@ function updateFilterTabCounts() {
       ent_eye: "ENT & Eye"
     };
     const label = baseLabels[cat] || cat;
-    tab.innerText = count > 0 ? `${label} (${count})` : label;
+    const badge = cat === "sg_classics" ? `<span class="sg-badge">SG</span> ` : "";
+    tab.innerHTML = `${badge}${escapeHtml(label)}${count > 0 ? ` <span class="tab-count">${count}</span>` : ""}`;
   });
 }
 
@@ -696,7 +759,7 @@ function toggleBlindMode() {
 
   if (isBlindMode) {
     if (icon) icon.innerText = "🔒";
-    if (label) label.innerText = "Blind Mode (Hide Diagnoses)";
+    if (label) label.innerText = "Blind Mode";
     if (pill) {
       pill.innerText = "ON";
       pill.className = "px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30";
@@ -716,24 +779,35 @@ function renderCasesGrid(cases) {
   const grid = document.getElementById("cases-grid");
   if (!grid) return;
   grid.innerHTML = "";
+  renderProgressSummary();
 
   if (cases.length === 0) {
+    const q = currentSearchQuery ? `“${escapeHtml(currentSearchQuery)}”` : "this filter";
     grid.innerHTML = `
-      <div class="col-span-full card-surface rounded-xl p-8 text-center text-zinc-400 text-xs">
-        No cases matched your search.
-        <button onclick="filterCases('all'); document.getElementById('station-search-input').value=''; handleStationSearch('');" class="text-emerald-400 underline ml-1 font-medium">Reset filters</button>
+      <div class="col-span-full card-surface rounded-xl px-6 py-12 text-center space-y-2">
+        <div class="text-2xl opacity-60">🔍</div>
+        <p class="text-sm text-zinc-300">No stations match ${q}</p>
+        <p class="text-xs text-zinc-500">Try a symptom (“chest pain”), an organ (“liver”) or a specialty.</p>
+        <button onclick="filterCases('all'); document.getElementById('station-search-input').value=''; handleStationSearch('');" class="mt-2 px-3 py-1.5 rounded-lg card-surface hover:border-zinc-600 text-xs text-emerald-400 font-medium transition">Clear search &amp; filters</button>
       </div>
     `;
     return;
   }
 
+  const progress = loadProgress();
+
   cases.forEach(c => {
-    const card = document.createElement("div");
-    card.className = "card-surface-interactive rounded-xl p-4 flex flex-col justify-between gap-3.5 cursor-pointer group";
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "card-surface-interactive text-left rounded-xl p-4 flex flex-col justify-between gap-3.5 cursor-pointer group";
     card.onclick = () => launchInstantBlitz(c.id);
+    const rec = progress[c.id];
+    const footerAction = rec
+      ? `<span class="font-mono text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${scoreTone(rec.best)}" title="Best of ${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"}">Best ${rec.best}%</span>`
+      : `<span class="font-medium text-zinc-300 group-hover:text-emerald-400 shrink-0 transition">Start →</span>`;
 
     const topTag = c.isSgClassic
-      ? `<span class="text-[11px] font-medium text-zinc-300">🇸🇬 SG • ${escapeHtml(c.clusterLabel)}</span>`
+      ? `<span class="text-[11px] font-medium text-zinc-300"><span class="sg-badge">SG</span> ${escapeHtml(c.clusterLabel)}</span>`
       : `<span class="text-[11px] font-medium text-zinc-400">${escapeHtml(c.shortSpecialty)} • ${escapeHtml(c.clusterLabel)}</span>`;
 
     const displayTitle = isBlindMode ? c.blindPrompt : c.title;
@@ -746,7 +820,7 @@ function renderCasesGrid(cases) {
         <!-- 1. Top Row: Specialty/Symptom Tag + Target Time Pill -->
         <div class="flex items-center justify-between gap-2">
           ${topTag}
-          <span class="font-mono text-[11px] text-zinc-400 bg-[#090A0F] hairline-border px-2 py-0.5 rounded">
+          <span class="font-mono text-[11px] text-zinc-400 bg-[#090A10] hairline-border px-2 py-0.5 rounded">
             ${escapeHtml(formatTargetBadge(c.targetSeconds))}
           </span>
         </div>
@@ -763,7 +837,7 @@ function renderCasesGrid(cases) {
       <!-- 3. Subtle Footer: Vitals Preview + Start -> -->
       <div class="pt-2.5 hairline-border-t flex items-center justify-between gap-2 text-[11px]">
         <span class="font-mono text-zinc-500 truncate">${escapeHtml(c.compactVitals)}</span>
-        <span class="font-medium text-zinc-300 group-hover:text-emerald-400 shrink-0 transition">Start →</span>
+        ${footerAction}
       </div>
     `;
 
@@ -774,9 +848,15 @@ function renderCasesGrid(cases) {
 function startRandomCase() {
   const pool = getFilteredCases().length > 0 ? getFilteredCases() : currentCases;
   if (pool.length === 0) return;
-  const candidates = pool.length > 1 && activeCase
+  let candidates = pool.length > 1 && activeCase
     ? pool.filter(c => c.id !== activeCase.id)
     : pool;
+  // Prefer stations not yet attempted, then ones scoring below a clear pass
+  const progress = loadProgress();
+  const fresh = candidates.filter(c => !progress[c.id]);
+  const weak = candidates.filter(c => progress[c.id] && progress[c.id].best < 65);
+  if (fresh.length > 0) candidates = fresh;
+  else if (weak.length > 0) candidates = weak;
   const pick = candidates[Math.floor(Math.random() * candidates.length)];
   if (pick) launchInstantBlitz(pick.id);
 }
@@ -903,6 +983,15 @@ function updateTimerDisplay() {
   if (!timerEl) return;
 
   const remaining = targetSeconds - elapsedSeconds;
+
+  const fill = document.getElementById("pace-bar-fill");
+  if (fill) {
+    const pct = Math.min(100, (elapsedSeconds / Math.max(1, targetSeconds)) * 100);
+    fill.style.width = `${pct}%`;
+    fill.className = "h-full " + (remaining < 0 ? "bg-rose-400/90" : remaining <= 20 ? "bg-amber-400/90" : "bg-emerald-400/80");
+    fill.parentElement?.setAttribute("aria-valuenow", String(Math.round(pct)));
+  }
+
   if (remaining >= 0) {
     timerEl.innerText = formatSecondsMMSS(remaining);
     if (remaining <= 20) {
@@ -1025,7 +1114,7 @@ function fireSpamMacro(macroType) {
     macroQuery = "past medical history diabetes hypertension surgery medications blood thinners allergies compliance";
     forcedCategories = ["past_history", "drug_history"];
   } else if (macroType === "social_epi") {
-    macroTitle = "🇸🇬 Social & Epi";
+    macroTitle = "Social & Epi";
     macroQuery = "occupation army camp tekong travel hawker food smoking alcohol family history";
     forcedCategories = ["social"];
   } else if (macroType === "exam_vitals") {
@@ -1078,8 +1167,28 @@ function executeBlitzTurn(queryText, forcedCategories = null, macroBadge = null)
   }
 }
 
+// Clinical acronyms that should stay upper-case (or keep their conventional casing)
+const GATE_TITLE_TERMS = {
+  pmhx: "PMHx", pshx: "PSHx", dhx: "DHx", shx: "SHx", fhx: "FHx", hpi: "HPI", ice: "ICE",
+  socrates: "SOCRATES", copd: "COPD", co2: "CO₂", o2: "O₂", ssri: "SSRI", nsaid: "NSAID", nsaids: "NSAIDs",
+  ocp: "OCP", dvt: "DVT", pe: "PE", ecg: "ECG", ct: "CT", lp: "LP", lmp: "LMP", pid: "PID", uti: "UTI",
+  gi: "GI", ent: "ENT", npc: "NPC", dka: "DKA", hhs: "HHS", tb: "TB", hiv: "HIV", std: "STD", sti: "STI",
+  bp: "BP", hr: "HR", rr: "RR", gcs: "GCS", ckd: "CKD", ihd: "IHD", af: "AF", mi: "MI", acs: "ACS",
+  ibd: "IBD", ibs: "IBS", sle: "SLE", ra: "RA", ns: "NS", nsf: "NSF", ed: "ED", icu: "ICU",
+};
+
 function formatGateTitle(key) {
-  return String(key || "").replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+  // "rf_co2_narcosis" -> "CO₂ narcosis"; "pmhx_drugs_allergies" -> "PMHx, drugs & allergies"
+  const words = String(key || "").toLowerCase().split(/_+/).filter(Boolean);
+  if (words[0] === "rf" || (words[0] === "red" && words[1] === "flag")) {
+    words.splice(0, words[0] === "rf" ? 1 : 2); // the red-flag tag already says so
+  }
+  if (words.length === 0) return "Finding";
+  const out = words.map((w, i) => GATE_TITLE_TERMS[w] || (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w));
+  if (out.length >= 3 && words[0] === "pmhx") {
+    return `${out[0]}, ${out.slice(1, -1).join(", ")} & ${out[out.length - 1]}`;
+  }
+  return out.join(" ");
 }
 
 function appendMinimalistFindingCard(result, queryText, macroBadge) {
@@ -1164,15 +1273,30 @@ function triggerInlineTwistBanner() {
     ).join("");
   }
 
-  const primaryHyp = (activeCase.differentials && activeCase.differentials[0]?.name) ||
-    Object.keys(pert.expected_shifts || {})[0] ||
-    activeCase.title;
-  const shortHyp = String(primaryHyp).split("(")[0].trim();
+  // In Blind Mode don't name the diagnosis before the candidate commits; it is revealed after the vote
   const targetEl = document.getElementById("twist-target-hypothesis");
-  if (targetEl) targetEl.innerText = shortHyp;
+  if (targetEl) targetEl.innerText = isBlindMode ? "your leading diagnosis" : twistHypothesisLabel();
+
+  const statusPill = document.getElementById("twist-status-pill");
+  if (statusPill) {
+    statusPill.innerText = "Vote below";
+    statusPill.className = "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 whitespace-nowrap";
+  }
 
   document.getElementById("twist-rationale-box")?.classList.add("hidden");
   banner.classList.remove("hidden");
+}
+
+// The hypothesis shown in the banner must be the same one the vote is scored against
+function twistHypothesisKey() {
+  const pert = activeCase?.perturbation || {};
+  return Object.keys(pert.expected_shifts || {})[0] ||
+    (activeCase?.differentials && activeCase.differentials[0]?.name) ||
+    activeCase?.title || "";
+}
+
+function twistHypothesisLabel() {
+  return String(twistHypothesisKey()).split("(")[0].trim();
 }
 
 function submitQuickTwistVote(voteType) {
@@ -1180,7 +1304,9 @@ function submitQuickTwistVote(voteType) {
   clientSession.perturbationVoted = true;
 
   const pert = activeCase.perturbation;
-  const primaryHyp = Object.keys(pert.expected_shifts || {})[0] || activeCase.title;
+  const primaryHyp = twistHypothesisKey();
+  const targetEl = document.getElementById("twist-target-hypothesis");
+  if (targetEl) targetEl.innerText = twistHypothesisLabel();
   const expectedVal = (pert.expected_shifts && pert.expected_shifts[primaryHyp]) ?? 2;
 
   const isCorrect =
@@ -1195,8 +1321,8 @@ function submitQuickTwistVote(voteType) {
   if (statusPill) {
     statusPill.innerText = isCorrect ? "✓ Concordant (+2)" : "Reviewed";
     statusPill.className = isCorrect
-      ? "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400"
-      : "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300";
+      ? "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 whitespace-nowrap"
+      : "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 whitespace-nowrap";
   }
 
   const rationaleBox = document.getElementById("twist-rationale-box");
@@ -1257,7 +1383,7 @@ function renderGateChecklist() {
     btn.onclick = () => unlockSingleGateByClick(g.key);
     btn.className = isUnlocked
       ? "text-left px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] flex items-center justify-between gap-2 transition"
-      : "text-left px-2.5 py-1.5 rounded-lg bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-400 text-[11px] flex items-center justify-between gap-2 transition";
+      : "text-left px-2.5 py-1.5 rounded-lg bg-[#090A10] hairline-border hover:border-zinc-700 text-zinc-400 text-[11px] flex items-center justify-between gap-2 transition";
 
     btn.innerHTML = `
       <span class="truncate">${isUnlocked ? "✓" : (isRf ? "🚨" : "+")} ${escapeHtml(formatGateTitle(g.key))}</span>
@@ -1358,7 +1484,7 @@ function updateMicUI(active) {
     btn.className = "w-9 h-9 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-400 mic-listening flex items-center justify-center shrink-0 transition";
     icon.className = "fa-solid fa-stop text-xs";
   } else {
-    btn.className = "w-9 h-9 rounded-lg bg-[#090A0F] hairline-border hover:border-zinc-700 text-zinc-400 hover:text-zinc-100 flex items-center justify-center shrink-0 transition";
+    btn.className = "w-9 h-9 rounded-lg bg-[#090A10] hairline-border hover:border-zinc-700 text-zinc-400 hover:text-zinc-100 flex items-center justify-center shrink-0 transition";
     icon.className = "fa-solid fa-microphone text-xs";
   }
 }
@@ -1387,7 +1513,7 @@ function openDiagnosisAndVivaStep() {
       <button
         type="button"
         onclick="appendDiagnosisChip('${escapeHtml(chip)}')"
-        class="px-2.5 py-1 rounded-md bg-[#090A0F] hairline-border hover:border-zinc-600 text-[11px] text-zinc-300 transition"
+        class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-[11px] text-zinc-300 transition"
       >
         + ${escapeHtml(chip)}
       </button>
@@ -1578,39 +1704,55 @@ function renderFinalScorecard(dxText, planText) {
   if (scorePctEl) {
     scorePctEl.innerText = `${totalScore}%`;
     scorePctEl.className = safetyPass
-      ? "font-mono text-2xl sm:text-3xl font-bold text-emerald-400"
-      : "font-mono text-2xl sm:text-3xl font-bold text-amber-400";
+      ? "font-mono text-3xl sm:text-4xl font-bold text-emerald-400"
+      : "font-mono text-3xl sm:text-4xl font-bold text-amber-400";
   }
 
   const gradeBadge = document.getElementById("card-grade-badge");
   if (gradeBadge) {
     gradeBadge.innerText = grade;
     gradeBadge.className = safetyPass
-      ? "text-xs font-medium px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300"
-      : "text-xs font-medium px-2 py-0.5 rounded bg-amber-500/15 text-amber-300";
+      ? "text-xs font-semibold px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
+      : "text-xs font-semibold px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-300";
+  }
+
+  // Persist this attempt once per station run (re-renders must not double count)
+  let progressNote = "";
+  if (!clientSession.progressRecorded) {
+    clientSession.progressRecorded = recordProgress(activeCase.id, totalScore, elapsedSeconds);
+  }
+  const pr = clientSession.progressRecorded;
+  if (pr) {
+    if (pr.prev && pr.isNewBest) progressNote = ` · New best (was ${pr.prev.best}%)`;
+    else if (pr.prev) progressNote = ` · Best ${pr.prev.best}%`;
+    else progressNote = " · First attempt";
   }
 
   const timeComp = document.getElementById("card-time-comparison");
   if (timeComp) {
-    timeComp.innerText = `Time: ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)} target`;
+    timeComp.innerText = `Time: ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)} target${progressNote}`;
   }
 
   // 2. 4 Clean Metric Pills
   const metricsGrid = document.getElementById("card-metrics-grid");
   if (metricsGrid) {
     const metrics = [
-      { label: "Red Flags (40%)", val: `${rfScore}/40`, sub: `${rfUnlocked}/${redFlagGates.length} cleared` },
-      { label: "History (20%)", val: `${ctScore}/20`, sub: `${ctUnlocked}/${clinicalTriggerGates.length} clues` },
-      { label: "Dx & Twist (25%)", val: `${pivotScore}/25`, sub: `${Math.round((pivotScore / 25) * 100)}% align` },
-      { label: "Management (15%)", val: `${vivaScore}/15`, sub: `${Math.round(vivaRatio * 100)}% key pts` }
+      { label: "Red Flags (40%)", val: `${rfScore}/40`, sub: `${rfUnlocked}/${redFlagGates.length} cleared`, ratio: rfScore / 40 },
+      { label: "History (20%)", val: `${ctScore}/20`, sub: `${ctUnlocked}/${clinicalTriggerGates.length} clues`, ratio: ctScore / 20 },
+      { label: "Dx & Twist (25%)", val: `${pivotScore}/25`, sub: `${Math.round((pivotScore / 25) * 100)}% align`, ratio: pivotScore / 25 },
+      { label: "Management (15%)", val: `${vivaScore}/15`, sub: `${Math.round(vivaRatio * 100)}% key pts`, ratio: vivaScore / 15 }
     ];
-    metricsGrid.innerHTML = metrics.map(m => `
-      <div class="bg-[#090A0F] hairline-border rounded-lg p-3 space-y-0.5">
+    metricsGrid.innerHTML = metrics.map(m => {
+      const pct = Math.max(0, Math.min(100, Math.round((m.ratio || 0) * 100)));
+      const bar = pct >= 85 ? "bg-emerald-400" : pct >= 65 ? "bg-sky-400" : pct >= 50 ? "bg-amber-400" : "bg-rose-400";
+      return `
+      <div class="bg-[#090A10] hairline-border rounded-lg p-3 space-y-1">
         <div class="text-[11px] text-zinc-400">${escapeHtml(m.label)}</div>
         <div class="font-mono text-sm font-semibold text-zinc-100">${escapeHtml(m.val)}</div>
+        <div class="h-1 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full rounded-full ${bar}" style="width:${pct}%"></div></div>
         <div class="text-[10px] font-mono text-zinc-500">${escapeHtml(m.sub)}</div>
-      </div>
-    `).join("");
+      </div>`;
+    }).join("");
   }
 
   // 3. Red Flags List
@@ -1620,7 +1762,7 @@ function renderFinalScorecard(dxText, planText) {
       const cleared = clientSession.unlockedGateKeys.has(g.key);
       const resp = g.response_text || g.response || "";
       return `
-        <div class="bg-[#090A0F] hairline-border rounded-lg p-2.5 flex items-start gap-2">
+        <div class="bg-[#090A10] hairline-border rounded-lg p-2.5 flex items-start gap-2">
           <span class="font-mono font-bold ${cleared ? 'text-emerald-400' : 'text-amber-400'} mt-0.5">${cleared ? '✓' : '!'}</span>
           <div class="space-y-0.5">
             <div class="font-medium ${cleared ? 'text-zinc-200' : 'text-amber-300'}">${escapeHtml(formatGateTitle(g.key))}</div>
@@ -1638,7 +1780,7 @@ function renderFinalScorecard(dxText, planText) {
     if (traps.length > 0) {
       trapsSec.classList.remove("hidden");
       trapsContainer.innerHTML = traps.map(t => `
-        <div class="bg-[#090A0F] hairline-border rounded-lg p-3 space-y-1">
+        <div class="bg-[#090A10] hairline-border rounded-lg p-3 space-y-1">
           <div class="font-medium text-amber-300">⚠️ ${escapeHtml(t.name)}</div>
           <div class="text-zinc-400">${escapeHtml(t.remediation)}</div>
         </div>
@@ -1677,22 +1819,22 @@ function renderFinalScorecard(dxText, planText) {
   if (sheetEl) {
     sheetEl.innerHTML = `
       <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="bg-[#090A0F] hairline-border rounded-lg p-3.5 space-y-1">
+        <div class="bg-[#090A10] hairline-border rounded-lg p-3.5 space-y-1">
           <div class="text-[10px] font-mono uppercase tracking-wider text-emerald-400">Textbook Approach Framework</div>
           <p class="text-zinc-300">${escapeHtml(caseRef.framework || libEntry.framework || "")}</p>
         </div>
-        <div class="bg-[#090A0F] hairline-border rounded-lg p-3.5 space-y-1">
+        <div class="bg-[#090A10] hairline-border rounded-lg p-3.5 space-y-1">
           <div class="text-[10px] font-mono uppercase tracking-wider text-amber-400">Key Diagnostic Rationale</div>
           <p class="text-zinc-300">${escapeHtml(activeCase.perturbation?.expert_rationale || caseRef.key_features || libEntry.etiology || "")}</p>
         </div>
       </div>
 
-      <div class="bg-[#090A0F] hairline-border rounded-lg p-3.5 space-y-1.5">
+      <div class="bg-[#090A10] hairline-border rounded-lg p-3.5 space-y-1.5">
         <div class="text-[10px] font-mono uppercase tracking-wider text-zinc-400">Top Differentials &amp; Discriminating Features</div>
         <ul class="space-y-1 list-disc list-inside text-zinc-300">${diffsHtml}</ul>
       </div>
 
-      <div class="bg-[#090A0F] hairline-border rounded-lg p-3.5 space-y-2.5">
+      <div class="bg-[#090A10] hairline-border rounded-lg p-3.5 space-y-2.5">
         <div class="text-[10px] font-mono uppercase tracking-wider text-zinc-400">Gold-Standard Investigations &amp; Management Key</div>
         ${vivaHtml}
       </div>

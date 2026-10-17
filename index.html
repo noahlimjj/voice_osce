@@ -110,6 +110,44 @@
         color: #475569 !important;
       }
     }
+
+    /* Badges, counts & keycaps */
+    .sg-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.04em;
+      padding: 1px 4px; border-radius: 4px; line-height: 1.2;
+      color: #FCA5A5; background: rgba(244, 63, 94, 0.12); border: 1px solid rgba(244, 63, 94, 0.3);
+    }
+    .tab-count {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 10px; opacity: 0.6; margin-left: 2px;
+    }
+    .kbd {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 10px; padding: 0 5px; border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.12); background: #090A10; color: #D4D4D8;
+    }
+    .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+
+    /* Visible keyboard focus everywhere */
+    :focus-visible { outline: 2px solid #34D399; outline-offset: 2px; border-radius: 8px; }
+    input:focus-visible, textarea:focus-visible { outline: none; }
+
+    #pace-bar-fill { transition: width 1s linear, background-color 0.4s ease; }
+
+    /* Comfortable tap targets on phones */
+    @media (max-width: 639px) {
+      header button, .filter-tab, #consultation-view button { min-height: 36px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+      }
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col antialiased selection:bg-emerald-500/30 selection:text-emerald-200">
@@ -140,7 +178,7 @@
         >
           <span>⏱️</span>
           <span class="hidden md:inline text-zinc-400">Pace:</span>
-          <span class="text-emerald-400 font-medium">60s–120s</span>
+          <span class="hidden sm:inline text-emerald-400 font-medium">60s–120s</span>
         </button>
 
         <button
@@ -158,7 +196,8 @@
           class="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-semibold text-xs flex items-center gap-1.5 transition shadow-sm"
         >
           <span>🎲</span>
-          <span>Random Station</span>
+          <span class="hidden sm:inline">Random Station</span>
+          <span class="sm:hidden">Random</span>
         </button>
       </div>
     </div>
@@ -243,13 +282,16 @@
         </button>
       </div>
 
+      <!-- Local progress (filled by app.js from localStorage) -->
+      <div id="progress-summary" class="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs min-h-[18px]"></div>
+
       <!-- Specialty / Symptom Cluster Tabs -->
       <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar select-none" id="specialty-filters">
         <button onclick="filterCases('all')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-zinc-100 text-zinc-950 transition" data-specialty="all">
           All (100)
         </button>
         <button onclick="filterCases('sg_classics')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="sg_classics">
-          🇸🇬 SG Classics (16)
+          <span class="sg-badge">SG</span> SG Classics
         </button>
         <button onclick="filterCases('chest_pain')" class="filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition" data-specialty="chest_pain">
           Chest Pain
@@ -296,14 +338,15 @@
     <section id="consultation-view" class="hidden max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
 
       <!-- Navigation & Triage Vitals Bar -->
-      <div class="card-surface rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
+      <div class="card-surface rounded-xl overflow-hidden">
+      <div class="px-4 py-2.5 flex flex-wrap items-center justify-between gap-2.5">
         <button onclick="exitStationToLibrary()" class="text-xs text-zinc-400 hover:text-white font-medium flex items-center gap-1.5 transition">
           <i class="fa-solid fa-arrow-left text-[10px]"></i>
           <span>Library</span>
         </button>
 
-        <!-- Monospace Vitals Summary -->
-        <div id="consult-vitals-strip" class="font-mono text-[11px] text-zinc-300 truncate max-w-xs sm:max-w-md">
+        <!-- Monospace Vitals Summary (wraps to its own row on phones) -->
+        <div id="consult-vitals-strip" class="font-mono text-[11px] text-zinc-300 order-last basis-full sm:order-none sm:basis-auto sm:flex-1 sm:min-w-0 sm:truncate sm:text-center">
           <!-- e.g. 19M NSF • BP 96/82 • HR 118 • T 36.9°C -->
         </div>
 
@@ -328,6 +371,10 @@
             <span id="voice-mode-label" class="hidden sm:inline">Silent</span>
           </button>
         </div>
+      </div>
+      <div id="pace-bar" class="h-0.5 bg-white/5" aria-hidden="true">
+        <div id="pace-bar-fill" class="h-full bg-emerald-400" style="width:0%"></div>
+      </div>
       </div>
 
       <!-- Patient Presentation Card -->
@@ -431,7 +478,7 @@
               💊 PMHx &amp; Meds
             </button>
             <button onclick="fireSpamMacro('social_epi')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
-              🇸🇬 Social &amp; Epi
+              🌏 Social &amp; Epi
             </button>
             <button onclick="fireSpamMacro('exam_vitals')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
               🩺 Exam &amp; Vitals
@@ -481,7 +528,7 @@
       </div>
 
       <!-- FINDINGS STREAM -->
-      <div id="chat-messages" class="space-y-2.5">
+      <div id="chat-messages" class="space-y-2.5 pb-20">
         <!-- Scannable Findings Cards stream here -->
       </div>
 

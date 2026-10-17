@@ -186,12 +186,14 @@ CASE_RESPIRATORY_PE = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="Withholding Anticoagulation While Awaiting CTPA",
+            trigger_keywords=['wait for ctpa', 'await ctpa', 'awaiting ctpa', 'after ctpa', 'delay anticoag'],
             description="Delaying life-saving anticoagulation in a high-probability PE patient to wait for a scanner slot.",
             trigger_condition="Candidate decides to wait for CTPA confirmation before giving heparin/LMWH.",
             remediation_advice="In high-probability PE patients with hemodynamic compromise and no bleeding contraindications, immediate empirical anticoagulation must be started before imaging."
         ),
         CognitiveTrap(
             trap_name="Anchoring on Musculoskeletal Strain in Young Adults",
+            trigger_keywords=['musculoskeletal', 'muscle strain', 'costochondritis', 'msk'],
             description="Attributing pleuritic pain to heavy lifting because the patient is young and otherwise healthy.",
             trigger_condition="Candidate considers muscle strain plausible despite hypoxia, tachycardia, and hemoptysis.",
             remediation_advice="Hemoptysis and hypoxia are NEVER caused by muscular strain. Always calculate the Wells score in unexplained dyspnea."

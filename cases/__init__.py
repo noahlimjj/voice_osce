@@ -3,6 +3,7 @@ Registry of VoiceOSCE Clinical Cases.
 Comprehensive curriculum across core MBBS and Postgraduate Medical specialties.
 """
 
+import copy
 from typing import Dict, List
 from voice_osce.cases.case_schema import OSCECase
 from voice_osce.cases.cardiology_acs import CASE_CARDIOLOGY_ACS
@@ -30,9 +31,10 @@ CASE_REGISTRY: Dict[str, OSCECase] = {
 }
 
 def get_case(case_id: str) -> OSCECase:
+    """Return a fresh copy of the case so per-session gate state never leaks between sessions."""
     if case_id not in CASE_REGISTRY:
         raise ValueError(f"Unknown case_id: {case_id}. Available: {list(CASE_REGISTRY.keys())}")
-    return CASE_REGISTRY[case_id]
+    return copy.deepcopy(CASE_REGISTRY[case_id])
 
 def list_cases() -> List[Dict[str, str]]:
     return [

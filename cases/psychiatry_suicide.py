@@ -166,12 +166,14 @@ CASE_PSYCHIATRY_SUICIDE = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="The Myth of 'Planting the Idea' (Hesitation to Ask Directly About Suicide)",
+            missed_gate_keys=['suicidal_ideation_intent'],
             description="Using vague euphemisms like 'Are you feeling down?' instead of directly asking 'Are you having thoughts of killing yourself?'.",
             trigger_condition="Candidate avoids direct questioning about suicidal ideation and methods.",
             remediation_advice="Robust psychiatric evidence proves that asking directly and compassionately about suicide does NOT increase suicidal behavior. It validates the patient's profound distress and is essential to preserve life."
         ),
         CognitiveTrap(
             trap_name="False Reassurance & Relying on Verbal 'Contracts for Safety'",
+            trigger_keywords=['contract', 'promise', 'send home', 'discharge', 'reassure'],
             description="Accepting a patient's casual promise ('I promise I won't do it again') and allowing them to go home without formal psychiatric detention.",
             trigger_condition="Candidate considers outpatient discharge based solely on patient's verbal promise.",
             remediation_advice="'Contracts for safety' have NO legal or clinical validity in high-risk suicidal crises. Patients with high intent and completed preparations require involuntary inpatient containment."

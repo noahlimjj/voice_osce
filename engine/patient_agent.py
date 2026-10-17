@@ -20,28 +20,29 @@ class StandardizedPatientAgent:
         self.unlocked_gate_keys: Set[str] = set()
         self.llm = get_llm_client()
 
+    @staticmethod
+    def _concept_matches(concept: str, text_lower: str) -> bool:
+        # Whole-word match at the start, allowing short inflections ("sweat" -> "sweating"),
+        # but not mid-word hits ("arm" in "alarm", "cause" in "because").
+        pattern = r"\b" + re.escape(concept.lower()) + r"(?:s|es|ed|d|ing|y|ly)?\b"
+        return re.search(pattern, text_lower) is not None
+
+    def _matching_gates(self, candidate_utterance: str) -> List[InformationGate]:
+        text_lower = candidate_utterance.lower()
+        return [
+            g for g in self.case.gates
+            if any(self._concept_matches(c, text_lower) for c in g.trigger_concepts)
+        ]
+
     def _check_and_unlock_gates(self, candidate_utterance: str) -> List[InformationGate]:
         """Inspect candidate inquiry and unlock matching information gates."""
-        text_lower = candidate_utterance.lower()
         newly_unlocked: List[InformationGate] = []
-
-        for gate in self.case.gates:
+        for gate in self._matching_gates(candidate_utterance):
             if gate.key in self.unlocked_gate_keys:
                 continue
-
-            # Check if any trigger concept matches
-            matched = False
-            for concept in gate.trigger_concepts:
-                pattern = r"\b" + re.escape(concept.lower()) + r"\b"
-                if re.search(pattern, text_lower) or concept.lower() in text_lower:
-                    matched = True
-                    break
-
-            if matched:
-                gate.unlocked = True
-                self.unlocked_gate_keys.add(gate.key)
-                newly_unlocked.append(gate)
-
+            gate.unlocked = True
+            self.unlocked_gate_keys.add(gate.key)
+            newly_unlocked.append(gate)
         return newly_unlocked
 
     def respond(self, candidate_utterance: str) -> str:
@@ -85,10 +86,14 @@ class StandardizedPatientAgent:
             patient_reply = llm_reply.strip()
         else:
             # Deterministic, high-yield clinical fallback
+            repeated = [g for g in self._matching_gates(candidate_utterance) if g not in newly_unlocked]
             if newly_unlocked:
                 patient_reply = " ".join([g.response_text for g in newly_unlocked])
+            elif repeated:
+                # Candidate re-asked something already disclosed: answer consistently again
+                patient_reply = "Like I said, doctor... " + repeated[0].response_text
             elif self.turn_count == 1:
-                patient_reply = f"Hello doctor... {self.case.gates[0].response_text}"
+                patient_reply = f"Hello doctor... it's this {self.case.brief.presenting_complaint.lower()}. I'm really not feeling well."
             else:
                 patient_reply = "I'm not quite sure what you mean, doctor. Could you explain or ask that again?"
 

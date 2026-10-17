@@ -81,8 +81,39 @@ class TestVoiceOSCE(unittest.TestCase):
         )
 
         score, matched, traps = engine.evaluate_reasoning_shift(candidate_eval, set())
-        self.assertGreaterEqual(score, 60.0)
-        self.assertGreater(len(matched), 0)
+        # 2 of 4 expert shifts addressed (dissection and GERD not mentioned)
+        self.assertEqual(score, 50.0)
+        self.assertEqual(len(matched), 2)
+
+        # Saying "avoid nitrates" must not trigger the nitrate trap; prescribing GTN must
+        _, _, traps = engine.evaluate_reasoning_shift("Confirms inferior STEMI. Avoid nitrates given RV infarct.", set())
+        self.assertFalse(any("Nitrate" in t.trap_name for t in traps))
+        _, _, traps = engine.evaluate_reasoning_shift("Inferior STEMI likely. Give sublingual GTN for pain.", set())
+        self.assertTrue(any("Nitrate" in t.trap_name for t in traps))
+
+    def test_04b_no_credit_for_empty_reasoning(self):
+        engine = PracticumScriptEngine(get_case("cardio_01"))
+        score, matched, _ = engine.evaluate_reasoning_shift("I am not sure.", set())
+        self.assertEqual(score, 0.0)
+        self.assertEqual(matched, [])
+
+    def test_04c_sessions_do_not_share_state(self):
+        a = StandardizedPatientAgent(get_case("ortho_02"))
+        a.respond("Any trouble emptying your bladder?")
+        fresh = get_case("ortho_02")
+        self.assertFalse(any(g.unlocked for g in fresh.gates))
+
+    def test_04d_no_substring_false_unlocks(self):
+        patient = StandardizedPatientAgent(get_case("cardio_01"))
+        patient.respond("Is that alarming because of anything?")  # contains "arm" and "cause" mid-word
+        self.assertNotIn("radiation", patient.unlocked_gate_keys)
+        self.assertNotIn("ice_ideas", patient.unlocked_gate_keys)
+
+    def test_05b_single_shared_word_is_not_credit(self):
+        examiner = ExaminerAgent(get_case("cardio_01"))
+        awarded, matched, _ = examiner.evaluate_answer("He is a male.")
+        self.assertEqual(matched, [])
+        self.assertEqual(awarded, 0.0)
 
     def test_05_examiner_viva_grading(self):
         case = get_case("cardio_01")

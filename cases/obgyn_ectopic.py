@@ -182,12 +182,14 @@ CASE_OBGYN_ECTOPIC = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="Omitting Pregnancy Test in Women of Childbearing Age",
+            missed_gate_keys=['lmp_pregnancy_status'],
             description="Treating pelvic pain as UTI, gastroenteritis, or muscular strain without performing an immediate urine or serum pregnancy test.",
             trigger_condition="Candidate fails to verify pregnancy status in a 26-year-old woman with abdominal pain.",
             remediation_advice="RULE OF THUMB IN ACUTE CARE: Every female patient of reproductive age presenting with lower abdominal or pelvic pain is pregnant with an ectopic pregnancy until a beta-hCG test proves otherwise."
         ),
         CognitiveTrap(
             trap_name="Missing the Significance of Shoulder Tip Pain",
+            missed_gate_keys=['shoulder_tip_pain'],
             description="Dismissing shoulder ache as unrelated musculoskeletal posture pain.",
             trigger_condition="Candidate ignores or fails to explore shoulder tip pain.",
             remediation_advice="Shoulder tip pain (Kehr's sign) indicates blood in the peritoneal cavity irritating the phrenic nerve (C3-C5), which shares dermatomes with the supraclavicular nerves. It is a hallmark of intraperitoneal rupture."

@@ -23,6 +23,8 @@ class UniversalLLMClient:
                 self._genai_client = genai.Client(api_key=self.api_key)
             except Exception as e:
                 logger.warning(f"Could not initialize google-genai client: {e}")
+        self.ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434").rstrip("/")
+        self.ollama_model = os.environ.get("OLLAMA_MODEL", "mistral")
         self._ollama_checked = False
         self._ollama_available = False
 
@@ -31,7 +33,7 @@ class UniversalLLMClient:
             self._ollama_checked = True
             try:
                 import httpx
-                r = httpx.get("http://localhost:11434/api/tags", timeout=0.2)
+                r = httpx.get(f"{self.ollama_url}/api/tags", timeout=1.0)
                 self._ollama_available = (r.status_code == 200)
             except Exception:
                 self._ollama_available = False
@@ -66,13 +68,16 @@ class UniversalLLMClient:
             try:
                 import httpx
                 r = httpx.post(
-                    "http://localhost:11434/api/generate",
+                    f"{self.ollama_url}/api/generate",
                     json={
-                        "model": "mistral",
-                        "prompt": f"{system_instruction}\n\nCandidate: {prompt}\nResponse:",
-                        "stream": False
+                        "model": self.ollama_model,
+                        "system": system_instruction,
+                        "prompt": prompt,
+                        "stream": False,
+                        "options": {"temperature": temperature},
                     },
-                    timeout=2.0
+                    # Local CPU generation routinely takes several seconds; 2s always timed out
+                    timeout=float(os.environ.get("OLLAMA_TIMEOUT", "60")),
                 )
                 if r.status_code == 200:
                     data = r.json()

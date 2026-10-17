@@ -171,12 +171,14 @@ CASE_ENDOCRINOLOGY_DKA = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="Stopping Insulin When Glucose Falls < 14 While Ketones Persist",
+            trigger_keywords=['stop insulin', 'stop the insulin', 'stopping insulin', 'stop the infusion', 'switch off insulin'],
             description="Turning off the insulin infusion because blood sugar has normalized, even though the patient remains in ketoacidosis.",
             trigger_condition="Candidate stops insulin when glucose drops, instead of adding 10% dextrose.",
             remediation_advice="INSULIN CLEARS KETONES, NOT JUST GLUCOSE. When blood glucose drops < 14 mmol/L, keep the insulin infusion running and run 10% Dextrose alongside it until the blood ketones drop < 0.6 mmol/L and venous pH > 7.30."
         ),
         CognitiveTrap(
             trap_name="The 'Sick Day Rules' Knowledge Deficit",
+            missed_gate_keys=['type1_insulin_omission'],
             description="Failing to educate the patient that insulin requirements actually INCREASE during acute illness.",
             trigger_condition="Candidate overlooks patient counseling on diabetic sick day rules.",
             remediation_advice="Never stop insulin during intercurrent illness! Infection releases counter-regulatory stress hormones (cortisol, adrenaline) that increase insulin resistance. Patients must check ketones and take supplemental rapid-acting insulin."

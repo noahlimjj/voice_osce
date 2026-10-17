@@ -176,12 +176,14 @@ CASE_NEUROLOGY_SAH = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="Premature Closure on Negative Head CT ('CT Negative, Discharge Home')",
+            trigger_keywords=['discharge', 'send home', 'sah excluded', 'rules out sah', 'rule out sah', 'excludes subarachnoid', 'rules out subarachnoid'],
             description="Reassuring the patient and discharging them home simply because the initial CT scan is normal.",
             trigger_condition="Candidate decides to discharge patient without discussing lumbar puncture or CTA.",
             remediation_advice="The classic pitfall in emergency neurology: A normal CT does NOT exclude an SAH. Overlooked 'warning leaks' / sentinel headaches carry a devastating risk of re-rupture and death. Always perform an LP at > 12h or CT angiogram."
         ),
         CognitiveTrap(
             trap_name="Dismissing Thunderclap as Migraine",
+            trigger_keywords=['migraine', 'triptan', 'tension headache'],
             description="Assuming the photophobia and nausea justify a diagnosis of simple migraine.",
             trigger_condition="Candidate anchors on migraine without respecting the < 1-minute onset speed.",
             remediation_advice="Any headache reaching 10/10 within 60 seconds is a thunderclap headache and MUST be treated as an intracranial vascular emergency until definitively proven otherwise."

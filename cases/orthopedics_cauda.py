@@ -197,12 +197,14 @@ CASE_ORTHOPEDICS_CAUDA = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="Omission of Cauda Equina Screen in Young Fit Athletes",
+            missed_gate_keys=['red_flag_bladder', 'red_flag_saddle'],
             description="Assuming young, heavily muscled athletes only have musculoskeletal strain and failing to directly ask about saddle numbness or bladder control.",
             trigger_condition="Candidate fails to inquire about urine/bowel habits or saddle anesthesia.",
             remediation_advice="EVERY patient with acute back pain and radiculopathy must be asked explicit red-flag questions for cauda equina syndrome. Missing CES can result in permanent catastrophic neurological disability and immediate medicolegal failure."
         ),
         CognitiveTrap(
             trap_name="Compliance Bias / Downplaying Patient Symptoms to Please Them",
+            trigger_keywords=['physiotherapy', 'physio', 'send home', 'discharge', 'simple analgesia'],
             description="Agreeing to patient's plea for painkillers or steroid shots to allow them to compete.",
             trigger_condition="Candidate suggests conservative management or injections instead of urgent MRI.",
             remediation_advice="Never compromise patient safety for sports deadlines. Explain the irreversible pathology clearly."

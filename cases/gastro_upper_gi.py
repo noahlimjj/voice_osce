@@ -173,12 +173,14 @@ CASE_GASTRO_UPPER_GI = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="The Over-Transfusion Trap ('Normalizing' Hemoglobin to > 10 g/dL)",
+            trigger_keywords=['above 10', 'over 10', '> 10', 'hb 10', 'hb of 10', 'normalise', 'normalize', 'liberal transfusion'],
             description="Transfusing blood aggressively to reach normal hemoglobin levels in a cirrhotic patient.",
             trigger_condition="Candidate sets a transfusion target of Hb > 9 or 10 g/dL.",
             remediation_advice="Groundbreaking RCT evidence (Villanueva et al., NEJM) proved that liberal transfusion (Hb > 9) significantly INCREASES mortality and re-bleeding rates by raising portal hydrostatic pressure and disrupting clot formation. Target strictly Hb 7-8 g/dL."
         ),
         CognitiveTrap(
             trap_name="Omission of Prophylactic Antibiotics in Cirrhotic Bleed",
+            absent_keywords=['antibiotic', 'ceftriaxone', 'co-amoxiclav', 'tazocin', 'piperacillin', 'ciprofloxacin', 'quinolone'],
             description="Focusing solely on blood and PPIs while forgetting prophylactic IV antibiotics.",
             trigger_condition="Candidate fails to order IV Ceftriaxone.",
             remediation_advice="Cirrhotic patients undergoing GI bleeds have severe bacterial translocation. Prophylactic Ceftriaxone reduces bacteremia, SBP, re-bleeding, and all-cause mortality."

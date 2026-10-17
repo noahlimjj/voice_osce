@@ -105,3 +105,14 @@ python -u simulate_all_stations.py
 
 This project is open-source software licensed under the [MIT License](LICENSE).
 Built with ❤️ for medical education, patient safety, and clinical excellence.
+
+## Optional: LLM-powered patient dialogue
+
+Without an LLM the patient answers from scripted, gated responses. To get free-form dialogue, set one of:
+
+| Variable | Purpose | Default |
+| :--- | :--- | :--- |
+| `GEMINI_API_KEY` | Use Google Gemini (`pip install google-genai`) | unset |
+| `OLLAMA_URL` | Ollama server to use if reachable | `http://localhost:11434` |
+| `OLLAMA_MODEL` | Ollama model name | `mistral` |
+| `OLLAMA_TIMEOUT` | Seconds to wait for a reply | `60` |

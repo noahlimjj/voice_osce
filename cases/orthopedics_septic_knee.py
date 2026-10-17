@@ -171,12 +171,14 @@ CASE_ORTHOPEDICS_SEPTIC_KNEE = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="The 'Just Gout' Anchoring Trap",
+            trigger_keywords=['just gout', 'gout flare', 'colchicine', 'pseudogout'],
             description="Assuming that every red, hot, swollen joint in a middle-aged male is simple crystal gout and prescribing Colchicine/NSAIDs without aspirating.",
             trigger_condition="Candidate decides to treat for gout without performing diagnostic joint aspiration.",
             remediation_advice="RULE: An acute hot swollen joint is SEPTIC ARTHRITIS until proven otherwise by arthrocentesis. Gout and septic arthritis frequently co-exist, and missing septic arthritis results in irreversible chondrolysis within 24-48 hours."
         ),
         CognitiveTrap(
             trap_name="Premature Oral Antibiotics Before Joint Aspiration",
+            absent_keywords=['aspirat', 'arthrocentesis', 'joint tap', 'tap the joint'],
             description="Starting empirical oral antibiotics in the clinic or ED prior to arthrocentesis.",
             trigger_condition="Candidate orders antibiotics before joint aspiration is completed.",
             remediation_advice="Never administer antibiotics prior to synovial fluid sampling unless the patient is in extremis with septic shock. Doing so compromises the pathogen yield and delays definitive tailored surgical management."

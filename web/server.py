@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Dict, Optional, Any, List
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -61,6 +62,7 @@ class ActiveStationSession:
 
 # In-memory store of active sessions
 SESSIONS: Dict[str, ActiveStationSession] = {}
+MAX_SESSIONS = 200
 
 
 # Pydantic Request Models
@@ -134,6 +136,9 @@ def api_start_session(req: StartSessionRequest):
 
     session = ActiveStationSession(case, req.candidate_name or "Dr. Noah Lim")
     SESSIONS[session.session_id] = session
+    # Bound memory: drop the oldest sessions (dicts preserve insertion order)
+    while len(SESSIONS) > MAX_SESSIONS:
+        SESSIONS.pop(next(iter(SESSIONS)))
 
     return {
         "session_id": session.session_id,
@@ -151,12 +156,17 @@ async def api_interact_text(session_id: str, req: TextQueryRequest):
         raise HTTPException(status_code=404, detail="Session not found.")
 
     candidate_text = req.text.strip()
-    reply = session.patient_agent.respond(candidate_text)
+    if not candidate_text:
+        raise HTTPException(status_code=400, detail="Empty question.")
+    if session.phase != "consultation":
+        raise HTTPException(status_code=409, detail="The consultation phase has ended.")
+    # LLM generation is blocking; keep it off the event loop
+    reply = await run_in_threadpool(session.patient_agent.respond, candidate_text)
 
-    # Check if perturbation should trigger
+    # Trigger the perturbation at the turn the case author specified
     trigger_perturbation = False
     perturbation_data = None
-    if session.patient_agent.turn_count == 3 and not session.perturbation_triggered:
+    if session.patient_agent.turn_count >= session.case.perturbation.trigger_turn and not session.perturbation_triggered:
         session.perturbation_triggered = True
         trigger_perturbation = True
         p = session.case.perturbation
@@ -191,6 +201,7 @@ async def api_interact_text(session_id: str, req: TextQueryRequest):
     ]
 
     return {
+        "candidate_text": candidate_text,
         "patient_reply": reply,
         "audio_url": audio_base64,
         "turn_count": session.patient_agent.turn_count,
@@ -211,9 +222,11 @@ async def api_interact_audio(session_id: str, file: UploadFile = File(...)):
     transcriber = get_transcriber()
 
     try:
-        candidate_text = transcriber.transcribe(io.BytesIO(audio_bytes))
+        candidate_text = await run_in_threadpool(transcriber.transcribe, io.BytesIO(audio_bytes))
     except Exception as e:
-        candidate_text = f"[Speech transcription failed: {e}]"
+        raise HTTPException(status_code=500, detail=f"Speech transcription failed: {e}")
+    if not candidate_text.strip():
+        raise HTTPException(status_code=422, detail="No speech detected. Please try again or type.")
 
     # Reuse interaction logic
     return await api_interact_text(session_id, TextQueryRequest(text=candidate_text))
@@ -306,13 +319,15 @@ def api_get_scorecard(session_id: str):
 
     session.phase = "completed"
     viva_awarded, viva_max = session.examiner_agent.get_total_viva_score()
+    unlocked = session.patient_agent.unlocked_gate_keys
     scorecard = RubricEvaluator.evaluate(
         case=session.case,
-        unlocked_gate_keys=session.patient_agent.unlocked_gate_keys,
+        unlocked_gate_keys=unlocked,
         viva_awarded=viva_awarded,
         viva_max=viva_max,
-        concordance_score=session.practicum_engine.concordance_score or 75.0,
-        triggered_traps=session.practicum_engine.triggered_traps,
+        # No free marks: an unanswered perturbation scores 0
+        concordance_score=session.practicum_engine.concordance_score,
+        triggered_traps=session.practicum_engine.final_traps(unlocked),
         candidate_name=session.candidate_name
     )
 

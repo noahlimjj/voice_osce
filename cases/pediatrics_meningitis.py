@@ -170,12 +170,14 @@ CASE_PEDIATRICS_MENINGITIS = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="Delaying Antibiotics for Lumbar Puncture in Suspected Meningococcal Disease",
+            trigger_keywords=['lp first', 'lumbar puncture first', 'before antibiotics', 'after the lp', 'after lp', 'await lp', 'wait for lp'],
             description="Insisting on performing a lumbar puncture before administering antibiotics.",
             trigger_condition="Candidate decides to perform an LP before giving IV Ceftriaxone in a purpuric infant in shock.",
             remediation_advice="FATAL ERROR: Never delay antibiotics for investigations in suspected meningococcal disease. Furthermore, performing an LP in a patient with severe coagulopathy or septic shock can cause fatal brainstem herniation or spinal cord hematoma."
         ),
         CognitiveTrap(
             trap_name="Failing to Reassess After Fluid Bolus",
+            absent_keywords=['reassess', 're-assess', 're-evaluate', 'repeat assessment', 'review after'],
             description="Administering fluid boluses without actively checking the liver edge and chest auscultation for signs of fluid overload.",
             trigger_condition="Candidate orders multiple fluid boluses without clinical reassessment criteria.",
             remediation_advice="In pediatric septic shock, always reassess heart rate, capillary refill, respiratory effort, and palpate the liver edge after every 10-20 mL/kg bolus before repeating fluids."

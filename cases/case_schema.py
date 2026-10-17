@@ -101,6 +101,10 @@ class CognitiveTrap:
     description: str
     trigger_condition: str        # e.g. "Fixated on musculoskeletal strain without testing lower limb reflexes"
     remediation_advice: str
+    # Machine-checkable detection rules (any one firing triggers the trap):
+    trigger_keywords: List[str] = field(default_factory=list)   # Phrases in the candidate's reasoning (ignored when negated, e.g. "avoid nitrates")
+    absent_keywords: List[str] = field(default_factory=list)    # Fires if the reasoning mentions none of these (errors of omission)
+    missed_gate_keys: List[str] = field(default_factory=list)   # Fires if every one of these history gates was left unexplored
 
 
 @dataclass

@@ -4,6 +4,8 @@ Conducts structured oral interrogation, grades differential justifications, and 
 """
 
 from __future__ import annotations
+import math
+import re
 from typing import List, Dict, Tuple
 from voice_osce.cases.case_schema import OSCECase, VivaQuestion
 from voice_osce.engine.speech_synthesizer import SpeechSynthesizer
@@ -21,6 +23,21 @@ class ExaminerAgent:
         self.question_feedback: Dict[int, List[str]] = {}
         self.transcript: List[Tuple[str, str]] = []
 
+    _STOPWORDS = {
+        "and", "the", "with", "for", "due", "from", "into", "than", "this", "that", "only",
+        "per", "via", "all", "any", "are", "not", "use", "using", "min", "mins", "hour", "hours",
+    }
+
+    @classmethod
+    def _key_point_covered(cls, key_point: str, answer_words: List[str]) -> bool:
+        """A key point counts when enough of its distinctive terms appear (stem-matched) in the answer."""
+        terms = [t for t in re.findall(r"[a-z0-9]+", key_point.lower()) if len(t) > 2 and t not in cls._STOPWORDS]
+        if not terms:
+            return False
+        hits = sum(1 for t in terms if any(w.startswith(t[:6]) for w in answer_words))
+        needed = 1 if len(terms) == 1 else (2 if len(terms) <= 4 else max(2, math.ceil(len(terms) * 0.3)))
+        return hits >= needed
+
     def get_current_question(self) -> VivaQuestion | None:
         if self.current_q_index < len(self.case.viva_questions):
             return self.case.viva_questions[self.current_q_index]
@@ -35,10 +52,9 @@ class ExaminerAgent:
         text_lower = candidate_answer.lower()
         matched_points: List[str] = []
 
+        answer_words = re.findall(r"[a-z0-9]+", text_lower)
         for kp in q.key_points_required:
-            kp_words = [w.lower() for w in kp.split() if len(w) > 3]
-            # Match if key tokens exist in answer
-            if any(w in text_lower for w in kp_words):
+            if self._key_point_covered(kp, answer_words):
                 matched_points.append(kp)
 
         # Proportion of key points matched

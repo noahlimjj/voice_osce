@@ -202,12 +202,14 @@ CASE_CARDIOLOGY_ACS = OSCECase(
     cognitive_traps=[
         CognitiveTrap(
             trap_name="Reflexive Nitrate Administration in RV Infarction",
+            trigger_keywords=['nitrate', 'gtn', 'glyceryl trinitrate'],
             description="Prescribing GTN spray or IV nitrates automatically for inferior chest pain without inspecting V4R lead.",
             trigger_condition="Candidate orders sublingual GTN despite inferior STEMI with RV involvement.",
             remediation_advice="Always obtain right-sided lead V4R in inferior STEMIs. RV infarction leads to preload-dependence; nitrates cause sudden profound hypotension."
         ),
         CognitiveTrap(
             trap_name="Premature Closure on Musculoskeletal / Gastric Pain",
+            trigger_keywords=['indigestion', 'gastritis', 'reflux', 'gerd', 'antacid'],
             description="Accepting patient's initial explanation of 'gastric indigestion after oily lunch'.",
             trigger_condition="Candidate anchors on indigestion because pain started after eating.",
             remediation_advice="In patients over 50 with cardiovascular risk factors, epigastric/lower chest discomfort must be treated as acute coronary syndrome until an ECG proves otherwise."

@@ -19,6 +19,23 @@ let mediaRecorder = null;
 let audioChunks = [];
 let isRecording = false;
 
+// Escape text before interpolating into innerHTML (clinical text contains "<", ">" and "&")
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+// fetch wrapper that surfaces FastAPI error details instead of failing silently
+async function apiJson(url, options) {
+  const res = await fetch(url, options);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || `Request failed (${res.status})`);
+  }
+  return data;
+}
+
 // Initialize on DOM ready
 document.addEventListener("DOMContentLoaded", async () => {
   await loadCases();
@@ -272,12 +289,11 @@ async function sendCandidateMessage() {
   input.value = "";
 
   try {
-    const res = await fetch(`/api/sessions/${activeSessionId}/interact`, {
+    const data = await apiJson(`/api/sessions/${activeSessionId}/interact`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text })
     });
-    const data = await res.json();
 
     // Append Patient Message with voice audio
     appendChatMessage(activeCase.persona.name, data.patient_reply, "patient", data.audio_url);
@@ -290,7 +306,7 @@ async function sendCandidateMessage() {
       showPerturbationModal(data.perturbation_data);
     }
   } catch (err) {
-    appendChatMessage("System", "Error communicating with patient agent.", "system");
+    appendChatMessage("System", `Error communicating with patient agent: ${err.message}`, "system");
   }
 }
 
@@ -309,7 +325,7 @@ function appendChatMessage(speaker, text, type, audioUrl = null) {
   let audioButtonHtml = "";
   if (audioUrl) {
     audioButtonHtml = `
-      <button onclick="playSpeech('${audioUrl}')" class="text-xs text-emerald-400 hover:text-emerald-300 mt-2 flex items-center space-x-1.5 bg-slate-950/60 px-2.5 py-1 rounded-md border border-slate-800">
+      <button data-role="play-audio" class="text-xs text-emerald-400 hover:text-emerald-300 mt-2 flex items-center space-x-1.5 bg-slate-950/60 px-2.5 py-1 rounded-md border border-slate-800">
         <i class="fa-solid fa-volume-high text-[10px]"></i>
         <span>Play Spoken Voice</span>
       </button>
@@ -319,12 +335,14 @@ function appendChatMessage(speaker, text, type, audioUrl = null) {
   msgDiv.innerHTML = `
     <div class="max-w-[85%] sm:max-w-[75%] p-3.5 ${bubbleClass} shadow-md text-xs sm:text-sm">
       <div class="flex items-center justify-between gap-2 mb-1">
-        <span class="font-bold text-[11px] ${isCandidate ? 'text-emerald-200' : 'text-slate-400'}">${speaker}</span>
+        <span class="font-bold text-[11px] ${isCandidate ? 'text-emerald-200' : 'text-slate-400'}">${escapeHtml(speaker)}</span>
       </div>
-      <p class="leading-relaxed whitespace-pre-wrap">${text}</p>
+      <p class="leading-relaxed whitespace-pre-wrap">${escapeHtml(text)}</p>
       ${audioButtonHtml}
     </div>
   `;
+  const playBtn = msgDiv.querySelector('[data-role="play-audio"]');
+  if (playBtn) playBtn.addEventListener("click", () => playSpeech(audioUrl));
 
   container.appendChild(msgDiv);
   container.scrollTop = container.scrollHeight;
@@ -382,7 +400,8 @@ async function startRecording() {
     };
 
     mediaRecorder.onstop = async () => {
-      const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+      // MediaRecorder produces webm/ogg (not wav); keep the real container type for the decoder
+      const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
       await sendAudioMessage(audioBlob);
       stream.getTracks().forEach(track => track.stop());
     };
@@ -417,19 +436,24 @@ async function sendAudioMessage(audioBlob) {
   appendChatMessage("Doctor", "🎙️ Transcribing voice inquiry with faster-whisper...", "candidate");
 
   const formData = new FormData();
-  formData.append("file", audioBlob, "voice_inquiry.wav");
+  const ext = (audioBlob.type || "").includes("ogg") ? "ogg" : "webm";
+  formData.append("file", audioBlob, `voice_inquiry.${ext}`);
+
+  const container = document.getElementById("chat-messages");
+  const placeholder = container ? container.lastElementChild : null;
+  const removePlaceholder = () => {
+    if (placeholder && placeholder.parentNode) placeholder.parentNode.removeChild(placeholder);
+  };
 
   try {
-    const res = await fetch(`/api/sessions/${activeSessionId}/audio-interact`, {
+    const data = await apiJson(`/api/sessions/${activeSessionId}/audio-interact`, {
       method: "POST",
       body: formData
     });
-    const data = await res.json();
 
-    // Remove placeholder and append patient reply
-    const container = document.getElementById("chat-messages");
-    if (container.lastElementChild) container.removeChild(container.lastElementChild);
-
+    // Replace placeholder with what Whisper actually heard, then the patient reply
+    removePlaceholder();
+    appendChatMessage("Doctor", `🎙️ ${data.candidate_text}`, "candidate");
     appendChatMessage(activeCase.persona.name, data.patient_reply, "patient", data.audio_url);
     renderGateChecklist(data.unlocked_gates);
 
@@ -437,7 +461,8 @@ async function sendAudioMessage(audioBlob) {
       showPerturbationModal(data.perturbation_data);
     }
   } catch (err) {
-    appendChatMessage("System", "Audio transcription failed. Please try again or type.", "system");
+    removePlaceholder();
+    appendChatMessage("System", `Audio transcription failed: ${err.message}`, "system");
   }
 }
 
@@ -637,7 +662,7 @@ async function loadFinalScorecard() {
         <i class="fa-solid fa-triangle-exclamation text-rose-400 text-lg mt-0.5"></i>
         <div>
           <span class="font-bold">CRITICAL PATIENT SAFETY BREACH:</span>
-          <p class="text-rose-200 text-xs mt-0.5">Candidate failed to screen for mandatory red flags: ${card.missed_safety_gates.join(", ")}.</p>
+          <p class="text-rose-200 text-xs mt-0.5">Candidate failed to screen for mandatory red flags: ${escapeHtml(card.missed_safety_gates.join(", "))}.</p>
           <p class="text-slate-400 text-[11px] mt-1">In an MBBS / MRCP / GMC clinical exam, this triggers an automatic station failure regardless of total points.</p>
         </div>
       `;
@@ -651,7 +676,7 @@ async function loadFinalScorecard() {
       dDiv.className = "space-y-1.5";
       dDiv.innerHTML = `
         <div class="flex justify-between text-xs">
-          <span class="font-semibold text-slate-300">${d.name}</span>
+          <span class="font-semibold text-slate-300">${escapeHtml(d.name)}</span>
           <span class="font-bold text-slate-200">${d.score}/${d.max_score} (${d.percentage}%)</span>
         </div>
         <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-800">
@@ -673,10 +698,10 @@ async function loadFinalScorecard() {
         tDiv.innerHTML = `
           <div class="font-bold text-amber-400 flex items-center space-x-1.5">
             <i class="fa-solid fa-brain"></i>
-            <span>Cognitive Trap: ${t.name}</span>
+            <span>Cognitive Trap: ${escapeHtml(t.name)}</span>
           </div>
-          <p class="text-slate-300">${t.description}</p>
-          <p class="text-slate-400 text-[11px] italic">Remediation: ${t.remediation}</p>
+          <p class="text-slate-300">${escapeHtml(t.description)}</p>
+          <p class="text-slate-400 text-[11px] italic">Remediation: ${escapeHtml(t.remediation)}</p>
         `;
         trapsContainer.appendChild(tDiv);
       });

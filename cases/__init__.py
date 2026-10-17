@@ -16,6 +16,15 @@ from voice_osce.cases.psychiatry_suicide import CASE_PSYCHIATRY_SUICIDE
 from voice_osce.cases.pediatrics_meningitis import CASE_PEDIATRICS_MENINGITIS
 from voice_osce.cases.orthopedics_septic_knee import CASE_ORTHOPEDICS_SEPTIC_KNEE
 from voice_osce.cases.endocrinology_dka import CASE_ENDOCRINOLOGY_DKA
+from voice_osce.cases.sg_classics import (
+    CASE_SG_DENGUE,
+    CASE_SG_KLEBSIELLA,
+    CASE_SG_NPC,
+    CASE_SG_HEATSTROKE,
+    CASE_SG_MESENTERIC,
+)
+
+SG_CLASSIC_IDS = {"id_11", "gastro_12", "ent_13", "med_14", "surg_15"}
 
 CASE_REGISTRY: Dict[str, OSCECase] = {
     "cardio_01": CASE_CARDIOLOGY_ACS,
@@ -28,7 +37,15 @@ CASE_REGISTRY: Dict[str, OSCECase] = {
     "peds_08": CASE_PEDIATRICS_MENINGITIS,
     "ortho_09": CASE_ORTHOPEDICS_SEPTIC_KNEE,
     "endo_10": CASE_ENDOCRINOLOGY_DKA,
+    "id_11": CASE_SG_DENGUE,
+    "gastro_12": CASE_SG_KLEBSIELLA,
+    "ent_13": CASE_SG_NPC,
+    "med_14": CASE_SG_HEATSTROKE,
+    "surg_15": CASE_SG_MESENTERIC,
 }
+
+CASE_LIBRARY: Dict[str, OSCECase] = CASE_REGISTRY
+
 
 def get_case(case_id: str) -> OSCECase:
     """Return a fresh copy of the case so per-session gate state never leaks between sessions."""
@@ -36,7 +53,8 @@ def get_case(case_id: str) -> OSCECase:
         raise ValueError(f"Unknown case_id: {case_id}. Available: {list(CASE_REGISTRY.keys())}")
     return copy.deepcopy(CASE_REGISTRY[case_id])
 
-def list_cases() -> List[Dict[str, str]]:
+
+def list_cases() -> List[Dict[str, object]]:
     return [
         {
             "id": c.case_id,
@@ -44,7 +62,9 @@ def list_cases() -> List[Dict[str, str]]:
             "title": c.title,
             "patient": f"{c.persona.name} ({c.brief.age}yo {c.brief.gender})",
             "setting": c.brief.setting,
-            "complaint": c.brief.presenting_complaint
+            "complaint": c.brief.presenting_complaint,
+            "sg_classic": c.case_id in SG_CLASSIC_IDS,
         }
         for c in CASE_REGISTRY.values()
     ]
+

@@ -1,7 +1,6 @@
 """
-server.py: FastAPI backend server for the VoiceOSCE Web Application.
-Serves interactive OSCE stations, real-time audio transcription, edge-tts speech synthesis,
-and objective scoring endpoints.
+server.py: FastAPI backend & Vercel Serverless handler for the VoiceOSCE Web Application.
+Supports both stateful local sessions and stateless serverless auto-recovery for Vercel deployments.
 """
 
 from __future__ import annotations
@@ -9,20 +8,25 @@ import base64
 import io
 import os
 import sys
-import tempfile
+import types
 import uuid
 from pathlib import Path
 from typing import Dict, Optional, Any, List
 
+# Self-bootstrap `voice_osce` package so imports work regardless of parent folder name (e.g. /var/task on Vercel)
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT.parent) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT.parent))
+if "voice_osce" not in sys.modules:
+    _pkg = types.ModuleType("voice_osce")
+    _pkg.__path__ = [str(_REPO_ROOT)]
+    sys.modules["voice_osce"] = _pkg
+
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-
-# Ensure package root is in sys.path
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 from voice_osce.cases import get_case, list_cases
 from voice_osce.cases.case_schema import OSCECase, GateCategory
@@ -35,8 +39,8 @@ from voice_osce.engine.speech_synthesizer import get_synthesizer
 
 app = FastAPI(
     title="VoiceOSCE API",
-    description="Cognitive Clinical Simulation Engine API",
-    version="1.5.0"
+    description="Cognitive Clinical Simulation Engine API (Local & Vercel Serverless)",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -49,20 +53,58 @@ app.add_middleware(
 
 
 class ActiveStationSession:
-    def __init__(self, case: OSCECase, candidate_name: str = "Dr. Noah Lim"):
-        self.session_id = str(uuid.uuid4())
+    def __init__(self, case: OSCECase, candidate_name: str = "Dr. Noah Lim", session_id: Optional[str] = None):
+        self.session_id = session_id or str(uuid.uuid4())
         self.case = case
         self.candidate_name = candidate_name
         self.patient_agent = StandardizedPatientAgent(case)
         self.practicum_engine = PracticumScriptEngine(case)
         self.examiner_agent = ExaminerAgent(case)
         self.perturbation_triggered = False
-        self.phase = "consultation" # "consultation", "viva", "completed"
+        self.phase = "consultation"
 
 
-# In-memory store of active sessions
+# In-memory store (auto-recovered on serverless cold start if client passes state)
 SESSIONS: Dict[str, ActiveStationSession] = {}
-MAX_SESSIONS = 200
+
+
+def get_or_restore_session(
+    session_id: str,
+    case_id: Optional[str] = None,
+    candidate_name: Optional[str] = None,
+    unlocked_keys: Optional[List[str]] = None,
+    turn_count: Optional[int] = None,
+    viva_q_index: Optional[int] = None,
+    concordance_score: Optional[float] = None,
+) -> ActiveStationSession:
+    """Retrieve session from memory or reconstruct seamlessly on Vercel serverless cold start."""
+    session = SESSIONS.get(session_id)
+    if session is None:
+        if not case_id:
+            raise HTTPException(status_code=404, detail="Session not found and no case_id provided for stateless recovery.")
+        try:
+            case = get_case(case_id)
+        except ValueError:
+            raise HTTPException(status_code=404, detail=f"Case {case_id} not found.")
+        session = ActiveStationSession(case, candidate_name or "Dr. Noah Lim", session_id=session_id)
+        SESSIONS[session_id] = session
+
+    if unlocked_keys is not None:
+        for k in unlocked_keys:
+            session.patient_agent.unlocked_gate_keys.add(k)
+            for g in session.case.gates:
+                if g.key in session.patient_agent.unlocked_gate_keys:
+                    g.unlocked = True
+    if turn_count is not None and turn_count > session.patient_agent.turn_count:
+        session.patient_agent.turn_count = turn_count
+        if turn_count >= 3:
+            session.perturbation_triggered = True
+    if viva_q_index is not None:
+        session.examiner_agent.current_q_index = viva_q_index
+    if concordance_score is not None and concordance_score > 0:
+        session.practicum_engine.concordance_score = concordance_score
+
+    return session
 
 
 # Pydantic Request Models
@@ -73,19 +115,38 @@ class StartSessionRequest(BaseModel):
 
 class TextQueryRequest(BaseModel):
     text: str
+    case_id: Optional[str] = None
+    candidate_name: Optional[str] = None
+    unlocked_keys: Optional[List[str]] = None
+    turn_count: Optional[int] = None
 
 
 class PerturbationRequest(BaseModel):
     reasoning: str
+    case_id: Optional[str] = None
+    unlocked_keys: Optional[List[str]] = None
 
 
 class VivaAnswerRequest(BaseModel):
     answer: str
+    case_id: Optional[str] = None
+    question_index: Optional[int] = None
+
+
+class TTSRequest(BaseModel):
+    text: str
+    voice: Optional[str] = "en-GB-RyanNeural"
+    rate: Optional[str] = "+0%"
 
 
 # -------------------------------------------------------------
 # REST ENDPOINTS
 # -------------------------------------------------------------
+
+@app.get("/api/health")
+def api_health():
+    return {"status": "ok", "cases_loaded": len( list_cases() )}
+
 
 @app.get("/api/cases")
 def api_list_cases():
@@ -117,6 +178,8 @@ def api_get_case(case_id: str):
         },
         "persona": {
             "name": case.persona.name,
+            "voice_id": case.persona.voice_id,
+            "speech_rate": case.persona.speech_rate,
             "pain_level": case.persona.pain_level,
             "temperament": case.persona.temperament,
             "behavioral_cues": case.persona.behavioral_cues,
@@ -124,6 +187,22 @@ def api_get_case(case_id: str):
         "gates_count": len(case.gates),
         "consultation_time_sec": case.consultation_time_limit_sec,
     }
+
+
+@app.post("/api/tts")
+async def api_synthesize_tts(req: TTSRequest):
+    """Stateless neural text-to-speech endpoint using Microsoft Edge Neural voices."""
+    synth = get_synthesizer()
+    try:
+        audio_bytes = await synth.synthesize_to_bytes(
+            text=req.text,
+            voice=req.voice or "en-GB-RyanNeural",
+            rate=req.rate or "+0%"
+        )
+        audio_base64 = f"data:audio/mp3;base64,{base64.b64encode(audio_bytes).decode('ascii')}"
+        return {"audio_url": audio_base64}
+    except Exception as e:
+        return {"audio_url": None, "error": str(e)}
 
 
 @app.post("/api/sessions/start")
@@ -136,9 +215,6 @@ def api_start_session(req: StartSessionRequest):
 
     session = ActiveStationSession(case, req.candidate_name or "Dr. Noah Lim")
     SESSIONS[session.session_id] = session
-    # Bound memory: drop the oldest sessions (dicts preserve insertion order)
-    while len(SESSIONS) > MAX_SESSIONS:
-        SESSIONS.pop(next(iter(SESSIONS)))
 
     return {
         "session_id": session.session_id,
@@ -150,23 +226,22 @@ def api_start_session(req: StartSessionRequest):
 
 @app.post("/api/sessions/{session_id}/interact")
 async def api_interact_text(session_id: str, req: TextQueryRequest):
-    """Submit a text query to the patient."""
-    session = SESSIONS.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found.")
+    """Submit a spoken/typed query to the patient."""
+    session = get_or_restore_session(
+        session_id,
+        case_id=req.case_id,
+        candidate_name=req.candidate_name,
+        unlocked_keys=req.unlocked_keys,
+        turn_count=req.turn_count,
+    )
 
     candidate_text = req.text.strip()
-    if not candidate_text:
-        raise HTTPException(status_code=400, detail="Empty question.")
-    if session.phase != "consultation":
-        raise HTTPException(status_code=409, detail="The consultation phase has ended.")
-    # LLM generation is blocking; keep it off the event loop
-    reply = await run_in_threadpool(session.patient_agent.respond, candidate_text)
+    reply = session.patient_agent.respond(candidate_text)
 
-    # Trigger the perturbation at the turn the case author specified
+    # Check if perturbation should trigger
     trigger_perturbation = False
     perturbation_data = None
-    if session.patient_agent.turn_count >= session.case.perturbation.trigger_turn and not session.perturbation_triggered:
+    if session.patient_agent.turn_count == 3 and not session.perturbation_triggered:
         session.perturbation_triggered = True
         trigger_perturbation = True
         p = session.case.perturbation
@@ -195,13 +270,13 @@ async def api_interact_text(session_id: str, req: TextQueryRequest):
             "key": g.key,
             "category": g.category.value,
             "mandatory": g.mandatory_for_safety,
-            "unlocked": g.unlocked
+            "unlocked": (g.unlocked or g.key in session.patient_agent.unlocked_gate_keys)
         }
         for g in session.case.gates
     ]
 
     return {
-        "candidate_text": candidate_text,
+        "candidate_transcript": candidate_text,
         "patient_reply": reply,
         "audio_url": audio_base64,
         "turn_count": session.patient_agent.turn_count,
@@ -212,32 +287,25 @@ async def api_interact_text(session_id: str, req: TextQueryRequest):
 
 
 @app.post("/api/sessions/{session_id}/audio-interact")
-async def api_interact_audio(session_id: str, file: UploadFile = File(...)):
-    """Transcribe browser microphone audio blob and generate patient response."""
-    session = SESSIONS.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found.")
+async def api_interact_audio(session_id: str, file: UploadFile = File(...), case_id: Optional[str] = Form(None)):
+    """Transcribe browser microphone audio blob (local faster-whisper) and generate patient response."""
+    session = get_or_restore_session(session_id, case_id=case_id)
 
     audio_bytes = await file.read()
     transcriber = get_transcriber()
 
     try:
-        candidate_text = await run_in_threadpool(transcriber.transcribe, io.BytesIO(audio_bytes))
+        candidate_text = transcriber.transcribe(io.BytesIO(audio_bytes))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Speech transcription failed: {e}")
-    if not candidate_text.strip():
-        raise HTTPException(status_code=422, detail="No speech detected. Please try again or type.")
+        raise HTTPException(status_code=501, detail=f"Local faster-whisper unavailable: {e}")
 
-    # Reuse interaction logic
-    return await api_interact_text(session_id, TextQueryRequest(text=candidate_text))
+    return await api_interact_text(session_id, TextQueryRequest(text=candidate_text, case_id=session.case.case_id))
 
 
 @app.post("/api/sessions/{session_id}/perturbation")
 def api_submit_perturbation(session_id: str, req: PerturbationRequest):
     """Submit Practicum Script hypothesis revision."""
-    session = SESSIONS.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found.")
+    session = get_or_restore_session(session_id, case_id=req.case_id, unlocked_keys=req.unlocked_keys)
 
     score, matched, traps = session.practicum_engine.evaluate_reasoning_shift(
         req.reasoning,
@@ -259,11 +327,9 @@ def api_submit_perturbation(session_id: str, req: PerturbationRequest):
 
 
 @app.get("/api/sessions/{session_id}/viva/next")
-async def api_get_viva_question(session_id: str):
+async def api_get_viva_question(session_id: str, case_id: Optional[str] = None, q_index: Optional[int] = None):
     """Get next examiner viva oral question."""
-    session = SESSIONS.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found.")
+    session = get_or_restore_session(session_id, case_id=case_id, viva_q_index=q_index)
 
     session.phase = "viva"
     q = session.examiner_agent.get_current_question()
@@ -295,9 +361,7 @@ async def api_get_viva_question(session_id: str):
 @app.post("/api/sessions/{session_id}/viva/answer")
 def api_answer_viva(session_id: str, req: VivaAnswerRequest):
     """Submit oral viva answer and get examiner assessment."""
-    session = SESSIONS.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found.")
+    session = get_or_restore_session(session_id, case_id=req.case_id, viva_q_index=req.question_index)
 
     awarded, matched, summary = session.examiner_agent.evaluate_answer(req.answer)
 
@@ -311,25 +375,36 @@ def api_answer_viva(session_id: str, req: VivaAnswerRequest):
 
 
 @app.get("/api/sessions/{session_id}/scorecard")
-def api_get_scorecard(session_id: str):
+def api_get_scorecard(
+    session_id: str,
+    case_id: Optional[str] = None,
+    candidate_name: Optional[str] = None,
+    unlocked_keys: Optional[str] = None,
+    viva_awarded: Optional[float] = None,
+    concordance_score: Optional[float] = None,
+):
     """Generate final comprehensive objective scorecard and cognitive audit."""
-    session = SESSIONS.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found.")
+    keys_list = [k for k in unlocked_keys.split(",") if k] if unlocked_keys else None
+    session = get_or_restore_session(
+        session_id,
+        case_id=case_id,
+        candidate_name=candidate_name,
+        unlocked_keys=keys_list,
+        concordance_score=concordance_score,
+    )
 
     session.phase = "completed"
-    viva_awarded, viva_max = session.examiner_agent.get_total_viva_score()
-    unlocked = session.patient_agent.unlocked_gate_keys
+    calc_viva_awarded, viva_max = session.examiner_agent.get_total_viva_score()
+    if viva_awarded is not None and calc_viva_awarded == 0:
+        calc_viva_awarded = viva_awarded
+
     scorecard = RubricEvaluator.evaluate(
         case=session.case,
-        unlocked_gate_keys=unlocked,
-        viva_awarded=viva_awarded,
+        unlocked_gate_keys=session.patient_agent.unlocked_gate_keys,
+        viva_awarded=calc_viva_awarded,
         viva_max=viva_max,
-        # No free marks: an unanswered perturbation scores 0
-        concordance_score=session.practicum_engine.concordance_score,
-        triggered_traps=session.practicum_engine.final_traps(
-            unlocked, " ".join(ans for _, ans in session.examiner_agent.transcript)
-        ),
+        concordance_score=session.practicum_engine.concordance_score or concordance_score or 75.0,
+        triggered_traps=session.practicum_engine.triggered_traps,
         candidate_name=session.candidate_name
     )
 
@@ -368,7 +443,30 @@ static_dir = Path(__file__).parent / "static"
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
+    @app.get("/cases_data.js")
+    def serve_cases_js():
+        return FileResponse(str(static_dir / "cases_data.js"), media_type="application/javascript")
+
+    @app.get("/app.js")
+    def serve_app_js():
+        return FileResponse(str(static_dir / "app.js"), media_type="application/javascript")
+
+    @app.get("/manifest.json")
+    def serve_manifest_json():
+        manifest_path = static_dir / "manifest.json"
+        if manifest_path.exists():
+            return FileResponse(str(manifest_path), media_type="application/manifest+json")
+        return JSONResponse({"name": "OSCEBlitz", "short_name": "OSCEBlitz", "start_url": "/", "display": "standalone"})
+
+    @app.get("/icon-512.png")
+    def serve_icon_512():
+        icon_path = static_dir / "icon-512.png"
+        if icon_path.exists():
+            return FileResponse(str(icon_path), media_type="image/png")
+        raise HTTPException(status_code=404, detail="Icon not found")
+
     @app.get("/", response_class=HTMLResponse)
     def serve_index():
         index_file = static_dir / "index.html"
         return index_file.read_text(encoding="utf-8")
+

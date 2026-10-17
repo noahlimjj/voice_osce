@@ -1,0 +1,7 @@
+-r requirements.txt
+
+# Optional local CLI & on-device audio packages (not needed on Vercel / GitHub Pages)
+faster-whisper>=1.0.0
+sounddevice>=0.4.6
+python-telegram-bot>=21.0
+google-genai>=2.0.0

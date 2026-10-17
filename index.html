@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="theme-color" content="#020617">
+  <meta name="description" content="⚡ OSCEBlitz — High-Velocity Clinical Reasoning & Red-Flag Trainer. Built for LKCMedicine • NUS YLLSoM • Duke-NUS & MBBS Finals | 100% Cloud-Native">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="OSCEBlitz">
+  <title>⚡ OSCEBlitz — High-Velocity Clinical Reasoning & Red-Flag Trainer</title>
+  <link rel="icon" href="icon-512.png">
+  <link rel="apple-touch-icon" href="icon-512.png">
+  <link rel="manifest" href="manifest.json">
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#f0fdf4', 400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d' },
+            blitz: { 400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7' },
+            clinical: { 800: '#0f172a', 900: '#020617', card: '#1e293b' }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.85; transform: scale(1.04); } }
+    .recording-pulse { animation: pulse-slow 1.1s infinite ease-in-out; }
+    .glassmorphism { background: rgba(15, 23, 42, 0.78); backdrop-filter: blur(14px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .blitz-glow { box-shadow: 0 0 25px -5px rgba(16, 185, 129, 0.25), 0 0 15px -6px rgba(56, 189, 248, 0.2); }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #020617; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #475569; }
+  </style>
+</head>
+<body class="bg-[#020617] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="border-b border-slate-800/90 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40 px-3 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
+    <div class="flex items-center space-x-3 cursor-pointer group" onclick="showView('cases-view')">
+      <div class="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-400 p-0.5 shadow-lg shadow-emerald-500/20 group-hover:scale-105 transition">
+        <img src="icon-512.png" alt="OSCEBlitz" class="w-full h-full object-cover rounded-[10px]" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="hidden w-full h-full rounded-[10px] bg-slate-950 items-center justify-center text-emerald-400 font-black text-lg">
+          ⚡
+        </div>
+      </div>
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="font-black text-lg sm:text-xl tracking-tight bg-gradient-to-r from-emerald-400 via-teal-200 to-cyan-400 bg-clip-text text-transparent">⚡ OSCEBlitz</span>
+          <span class="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full uppercase tracking-wider">High-Velocity Trainer</span>
+          <span class="hidden md:inline-block text-[10px] font-semibold bg-rose-500/15 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full">🇸🇬 SG MBBS Edition</span>
+        </div>
+        <p class="text-[11px] text-slate-400 font-medium">🇸🇬 Built for LKCMedicine &bull; NUS YLLSoM &bull; Duke-NUS &amp; MBBS Finals | 100% Cloud-Native</p>
+      </div>
+    </div>
+
+    <!-- Header Mode Toggle & Controls -->
+    <div class="flex items-center flex-wrap gap-2 sm:gap-3">
+      <!-- Blitz vs Spoken Audio Mode Toggle -->
+      <div class="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-[11px] font-bold">
+        <button id="mode-btn-blitz" onclick="setInteractionMode('blitz')" class="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white shadow-sm transition flex items-center space-x-1" title="Instant bullet-point clinical findings in <10ms">
+          <span>⚡ Blitz Bullet Feed (Instant)</span>
+        </button>
+        <button id="mode-btn-audio" onclick="setInteractionMode('spoken')" class="px-2.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition flex items-center space-x-1" title="Spoken patient audio (1.4x speed)">
+          <span>🗣️ Spoken Patient Audio</span>
+        </button>
+      </div>
+
+      <div class="hidden xl:flex items-center space-x-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+        <i class="fa-solid fa-user-doctor text-emerald-400"></i>
+        <input type="text" id="candidate-name-input" value="Dr. Noah Lim" class="bg-transparent border-none text-slate-200 focus:outline-none w-28 font-semibold">
+      </div>
+
+      <button onclick="toggleAudioMute()" id="mute-btn" class="p-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 transition" title="Toggle Voice Audio Output">
+        <i class="fa-solid fa-volume-high text-sm text-emerald-400" id="mute-icon"></i>
+      </button>
+
+      <button onclick="showView('cases-view')" class="text-xs bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 font-semibold px-3 py-2 rounded-xl transition flex items-center space-x-1.5">
+        <i class="fa-solid fa-bolt text-amber-400"></i>
+        <span>Stations (15)</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6 lg:p-8 flex flex-col">
+
+    <!-- VIEW 1: CASE BROWSER -->
+    <section id="cases-view" class="space-y-6">
+      <!-- OSCEBlitz Hero Banner -->
+      <div class="glassmorphism blitz-glow rounded-2xl p-5 sm:p-6 border border-emerald-500/30 bg-gradient-to-r from-slate-950 via-slate-900 to-emerald-950/30 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="space-y-2 max-w-3xl">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+              ⚡ Blitz Rubric: 0% Bedside Fluff &bull; 100% Pure Clinical Reasoning &amp; Red Flags
+            </span>
+            <span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-500/20 text-sky-300 border border-sky-500/30">
+              <i class="fa-solid fa-gauge-high mr-1"></i>&lt;10ms Offline-Ready Engine
+            </span>
+          </div>
+          <h1 class="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
+            ⚡ OSCEBlitz — High-Velocity Clinical Reasoning &amp; Red-Flag Trainer
+          </h1>
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            Traditional voice OSCEs take too long when you just want to drill diagnostic schemas and safety exclusions.
+            <strong class="text-emerald-300">Spam bursts of clinical keywords</strong> (e.g. <code class="bg-slate-950 px-1.5 py-0.5 rounded text-amber-300 font-mono text-xs">onset character radiation fever travel meds allergies</code>), tap <strong class="text-cyan-300">1-Click Domain Sweeps</strong>, or use continuous voice to unlock positive findings &amp; pertinent negatives instantaneously.
+          </p>
+        </div>
+
+        <!-- Quick Stats Box -->
+        <div class="grid grid-cols-3 gap-2.5 shrink-0 text-center">
+          <div class="bg-slate-950/90 border border-slate-800 rounded-xl px-3.5 py-2.5">
+            <div class="text-lg sm:text-xl font-black text-emerald-400">15</div>
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">High-Yield Cases</div>
+          </div>
+          <div class="bg-slate-950/90 border border-rose-500/30 rounded-xl px-3.5 py-2.5">
+            <div class="text-lg sm:text-xl font-black text-rose-400">🇸🇬 5</div>
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-rose-300">SG Classics</div>
+          </div>
+          <div class="bg-slate-950/90 border border-cyan-500/30 rounded-xl px-3.5 py-2.5">
+            <div class="text-lg sm:text-xl font-black text-cyan-400">~60s</div>
+            <div class="text-[10px] font-semibold uppercase tracking-wider text-cyan-300">Blitz Run</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filter Pills & Search Bar -->
+      <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <!-- Station Selector Filter Bar -->
+        <div class="flex flex-wrap gap-1.5 bg-slate-900/95 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold" id="specialty-filters">
+          <button onclick="filterCases('all')" class="filter-tab px-3.5 py-2 rounded-xl bg-emerald-600 text-white shadow-sm transition" data-specialty="all">
+            All Stations (15)
+          </button>
+          <button onclick="filterCases('sg_classics')" class="filter-tab px-3.5 py-2 rounded-xl text-rose-300 hover:text-white bg-rose-500/10 border border-rose-500/20 transition" data-specialty="sg_classics">
+            🇸🇬 SG Classics (5)
+          </button>
+          <button onclick="filterCases('emergency')" class="filter-tab px-3.5 py-2 rounded-xl text-slate-400 hover:text-white transition" data-specialty="emergency">
+            Emergency / Acute
+          </button>
+          <button onclick="filterCases('medicine')" class="filter-tab px-3.5 py-2 rounded-xl text-slate-400 hover:text-white transition" data-specialty="medicine">
+            Medicine
+          </button>
+          <button onclick="filterCases('surgery')" class="filter-tab px-3.5 py-2 rounded-xl text-slate-400 hover:text-white transition" data-specialty="surgery">
+            Surgery / Ortho
+          </button>
+          <button onclick="filterCases('obgyn_peds_psych')" class="filter-tab px-3.5 py-2 rounded-xl text-slate-400 hover:text-white transition" data-specialty="obgyn_peds_psych">
+            OBGYN / Peds / Psych
+          </button>
+        </div>
+
+        <!-- Instant Station Search -->
+        <div class="relative w-full lg:w-72">
+          <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 text-xs"></i>
+          <input type="text" id="station-search-input" oninput="handleStationSearch(this.value)" placeholder="Search diagnosis, Tekong, chest pain..." class="w-full bg-slate-900 border border-slate-800 rounded-xl pl-9 pr-4 py-2 text-xs text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition">
+        </div>
+      </div>
+
+      <!-- Case Grid -->
+      <div id="cases-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-5">
+        <!-- Rendered via JS -->
+      </div>
+    </section>
+
+    <!-- VIEW 2: CANDIDATE BRIEF (OUTSIDE THE ROOM) -->
+    <section id="brief-view" class="hidden max-w-3xl mx-auto w-full space-y-6">
+      <div class="glassmorphism rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-2xl space-y-6">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
+          <div class="flex items-center space-x-2.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+            <span class="text-xs uppercase tracking-wider font-extrabold text-emerald-400">⚡ OSCEBlitz Station Door Brief</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="brief-sg-badge" class="hidden px-2.5 py-1 text-xs rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold">🇸🇬 SG Classic</span>
+            <span id="brief-specialty-badge" class="px-2.5 py-1 text-xs rounded-full bg-slate-800 text-slate-300 font-semibold">Specialty</span>
+          </div>
+        </div>
+
+        <div>
+          <h2 id="brief-case-title" class="text-2xl font-black text-white">Station Title</h2>
+          <p id="brief-setting" class="text-sm text-slate-400 mt-1 flex items-center space-x-2">
+            <i class="fa-solid fa-hospital text-emerald-400"></i>
+            <span>Setting</span>
+          </p>
+        </div>
+
+        <!-- Patient Demographics & Complaint -->
+        <div class="bg-slate-900/90 rounded-xl p-4 border border-slate-800 space-y-2">
+          <div class="flex justify-between items-center text-sm">
+            <span class="text-slate-400">Patient:</span>
+            <span id="brief-patient-demo" class="font-bold text-slate-100">Name (Age/Sex)</span>
+          </div>
+          <div class="flex justify-between items-start text-sm gap-4">
+            <span class="text-slate-400 shrink-0">Chief Complaint:</span>
+            <span id="brief-complaint" class="font-bold text-amber-300 text-right">Presenting Complaint</span>
+          </div>
+        </div>
+
+        <!-- Triage Vitals Grid -->
+        <div>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center space-x-1.5">
+            <i class="fa-solid fa-heart-pulse text-rose-400"></i>
+            <span>Triage Vital Signs</span>
+          </h3>
+          <div id="brief-vitals-grid" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- Candidate Instructions & Blitz Note -->
+        <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl p-4 text-sm text-emerald-200/90 space-y-2">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="font-bold text-emerald-400 flex items-center space-x-1.5 text-xs uppercase tracking-wider">
+              <i class="fa-solid fa-bolt"></i>
+              <span>Blitz Mission &amp; Candidate Instructions:</span>
+            </div>
+            <span class="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+              ⚡ Blitz Rubric: 0% Bedside Fluff • 100% Pure Clinical Reasoning &amp; Red Flags
+            </span>
+          </div>
+          <p id="brief-instructions" class="text-xs sm:text-sm text-slate-300 leading-relaxed"></p>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="flex flex-col sm:flex-row gap-3 pt-2">
+          <button onclick="showView('cases-view')" class="px-4 py-3 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm transition">
+            &larr; Back to Stations
+          </button>
+          <button onclick="startConsultationSession()" class="flex-1 py-3.5 px-6 rounded-xl bg-gradient-to-r from-emerald-600 via-teal-500 to-cyan-500 hover:from-emerald-500 hover:to-cyan-400 text-white font-black text-sm sm:text-base shadow-lg shadow-emerald-600/25 flex items-center justify-center space-x-2 transition">
+            <span>⚡ Launch Blitz Station (Spam Questions &amp; Red Flags)</span>
+            <i class="fa-solid fa-bolt"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 3: CONSULTATION ROOM (BLITZ WORKSPACE) -->
+    <section id="consultation-view" class="hidden flex-1 flex flex-col gap-4">
+      <!-- Top Station Status Bar -->
+      <div class="bg-slate-900/95 border border-slate-800 rounded-2xl p-3 sm:p-4 flex flex-wrap items-center justify-between gap-3 shadow-md">
+        <div class="flex items-center space-x-3">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 border border-emerald-400/30 flex items-center justify-center text-white font-black text-base shadow-sm" id="consult-patient-avatar">
+            P
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span id="consult-patient-name" class="font-extrabold text-slate-100 text-sm sm:text-base">Patient Name</span>
+              <span id="consult-pain-badge" class="text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/30 px-2 py-0.5 rounded-full font-bold">Pain 8/10</span>
+              <span id="consult-sg-badge" class="hidden text-[10px] bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2 py-0.5 rounded-full font-bold">🇸🇬 SG Classic</span>
+            </div>
+            <p id="consult-station-title" class="text-xs text-slate-400 truncate max-w-xs sm:max-w-lg">Station Title</p>
+          </div>
+        </div>
+
+        <!-- Inline Triage Vitals Strip (Desktop) -->
+        <div id="consult-vitals-strip" class="hidden xl:flex items-center gap-2 text-[11px] bg-slate-950/90 px-3 py-1.5 rounded-xl border border-slate-800">
+          <!-- Injected by JS -->
+        </div>
+
+        <!-- Timer & Blitz Actions -->
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+          <button onclick="triggerManualPerturbation()" id="perturbation-trigger-btn" class="px-3 py-1.5 rounded-xl bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition flex items-center space-x-1.5" title="Inspect Interim Bedside Labs / ECG / Imaging Perturbation">
+            <i class="fa-solid fa-flask-vial"></i>
+            <span>Interim Data / Labs</span>
+          </button>
+
+          <div class="flex items-center space-x-2 bg-slate-950 px-3 py-1.5 rounded-xl border border-slate-800">
+            <i class="fa-solid fa-bolt text-amber-400 text-xs"></i>
+            <span id="consult-timer" class="font-mono text-sm sm:text-base font-extrabold text-emerald-400">07:00</span>
+          </div>
+
+          <button onclick="endConsultationEarly()" class="px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition shadow-md flex items-center space-x-1.5">
+            <span>Evaluate &amp; Viva</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Split Layout: Left = Instant Clinical Findings Feed + Spam Bar | Right = Live Red-Flag & Gate Tracker -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-[540px]">
+
+        <!-- Left (8 cols): Instant Clinical Findings Feed + Rapid Question Burst Chips + Input -->
+        <div class="lg:col-span-8 flex flex-col glassmorphism rounded-2xl border border-slate-800 overflow-hidden shadow-xl">
+
+          <!-- Feed Top Subbar -->
+          <div class="px-4 py-2.5 bg-slate-900/90 border-b border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="flex items-center space-x-2">
+              <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+              <span id="feed-mode-label" class="font-bold text-emerald-300">⚡ Blitz Bullet Feed (Instant &lt;10ms Clinical Facts)</span>
+            </div>
+            <div class="flex items-center space-x-2">
+              <span id="voice-status-badge" class="text-[11px] text-slate-400 bg-slate-950 px-2.5 py-0.5 rounded-full border border-slate-800">
+                <i class="fa-solid fa-microphone-lines text-emerald-400 mr-1"></i>Browser Voice Ready
+              </span>
+            </div>
+          </div>
+
+          <!-- Chat / Findings Feed Container -->
+          <div id="chat-messages" class="flex-1 p-4 sm:p-5 overflow-y-auto space-y-3.5 max-h-[460px]">
+            <!-- Injected by JS -->
+          </div>
+
+          <!-- 1-TAP RAPID QUESTION BURST CHIPS ("SPAM BAR") -->
+          <div class="px-3 sm:px-4 py-2.5 bg-slate-950/95 border-t border-slate-800/90 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-bolt text-amber-400"></i>
+                <span>1-Tap Rapid Question Burst Chips ("Spam Bar") — Speed-Run Clinical Domains:</span>
+              </span>
+              <button onclick="fireSpamMacro('all_clinical')" class="text-[10px] font-bold text-amber-300 hover:text-amber-200 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 px-2 py-0.5 rounded-md transition">
+                🔥 Sweep All Gates
+              </button>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button onclick="fireSpamMacro('socrates')" class="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/30 text-xs font-bold transition flex items-center space-x-1">
+                <span>⚡ SOCRATES Sweep</span>
+              </button>
+              <button onclick="fireSpamMacro('red_flags')" class="px-2.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 text-xs font-bold transition flex items-center space-x-1">
+                <span>🚨 Red Flag Sweep</span>
+              </button>
+              <button onclick="fireSpamMacro('pmhx_meds')" class="px-2.5 py-1.5 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-300 border border-purple-500/30 text-xs font-bold transition flex items-center space-x-1">
+                <span>💊 PMHx / Meds / Allergies</span>
+              </button>
+              <button onclick="fireSpamMacro('social_epi')" class="px-2.5 py-1.5 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-xs font-bold transition flex items-center space-x-1">
+                <span>🇸🇬 Social / Epi / Travel</span>
+              </button>
+              <button onclick="fireSpamMacro('exam_vitals')" class="px-2.5 py-1.5 rounded-lg bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-300 border border-cyan-500/30 text-xs font-bold transition flex items-center space-x-1">
+                <span>🩺 Bedside Exam / Vitals</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Bottom Voice / Keyword Spam Input Controls -->
+          <div class="p-3 sm:p-4 bg-slate-900/95 border-t border-slate-800 flex items-center gap-2 sm:gap-2.5">
+            <button onclick="toggleMicrophoneRecord()" id="mic-record-btn" class="p-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/40 transition flex items-center justify-center shrink-0 shadow-sm" title="Toggle Live Browser Voice Recognition (or Whisper fallback)">
+              <i class="fa-solid fa-microphone text-lg" id="mic-icon"></i>
+            </button>
+            <input type="text" id="candidate-text-input" placeholder="Spam keywords or questions (e.g. 'onset character radiation fever travel meds allergies')..." class="flex-1 bg-slate-950 border border-slate-700/80 rounded-xl px-4 py-3 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-emerald-500 transition font-medium">
+            <button onclick="sendCandidateMessage()" class="px-4 sm:px-5 py-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white font-extrabold text-xs sm:text-sm transition shrink-0 flex items-center space-x-1.5 shadow-md">
+              <i class="fa-solid fa-bolt text-xs"></i>
+              <span>Blitz Ask</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Right (4 cols): Live Red-Flag & Gate Tracker Sidebar -->
+        <div class="lg:col-span-4 glassmorphism rounded-2xl border border-slate-800 p-4 sm:p-5 flex flex-col space-y-4 shadow-xl overflow-y-auto max-h-[640px]">
+          <!-- Zero-Fluff Rubric Badge -->
+          <div class="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-2.5 text-[11px] font-bold text-emerald-300 text-center">
+            ⚡ Blitz Rubric: 0% Bedside Fluff &bull; 100% Pure Clinical Reasoning &amp; Red Flags
+          </div>
+
+          <!-- Progress Trackers: Red Flags Cleared & Clinical Gates Unlocked -->
+          <div class="space-y-3 bg-slate-950/80 p-3.5 rounded-xl border border-slate-800">
+            <!-- Red Flags Tracker -->
+            <div class="space-y-1.5">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-extrabold text-rose-400 flex items-center gap-1.5">
+                  <i class="fa-solid fa-shield-heart"></i>
+                  <span>Red Flags Cleared</span>
+                </span>
+                <span id="red-flags-counter" class="font-mono font-bold text-rose-300 bg-rose-500/15 px-2 py-0.5 rounded-full border border-rose-500/30">0/0</span>
+              </div>
+              <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                <div id="red-flags-bar" class="bg-gradient-to-r from-rose-500 to-amber-400 h-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+
+            <!-- Clinical Gates Tracker -->
+            <div class="space-y-1.5 pt-1">
+              <div class="flex items-center justify-between text-xs">
+                <span class="font-extrabold text-emerald-400 flex items-center gap-1.5">
+                  <i class="fa-solid fa-unlock-keyhole"></i>
+                  <span>Clinical Gates Unlocked</span>
+                </span>
+                <span id="gates-unlocked-counter" class="font-mono font-bold text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">0/0 Unlocked</span>
+              </div>
+              <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden border border-slate-800">
+                <div id="clinical-gates-bar" class="bg-gradient-to-r from-emerald-500 to-cyan-400 h-full transition-all duration-300" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 1-Tap "Reveal Missed Clues" Study Peek Controls -->
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400">Station Clue Gates</span>
+            <button onclick="toggleRevealMissedClues()" id="reveal-clues-btn" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 text-[11px] font-bold transition flex items-center space-x-1">
+              <i class="fa-regular fa-eye"></i>
+              <span>Reveal Missed Clues</span>
+            </button>
+          </div>
+
+          <!-- Gates Checklist List -->
+          <div id="gates-checklist-container" class="space-y-2 flex-1 text-xs overflow-y-auto pr-1">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- MODAL: PRACTICUM SCRIPT PERTURBATION -->
+    <div id="perturbation-modal" class="fixed inset-0 bg-slate-950/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+      <div class="glassmorphism border border-cyan-500/40 rounded-2xl max-w-2xl w-full p-6 sm:p-7 space-y-5 shadow-2xl shadow-cyan-500/10 max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <div class="flex items-center space-x-3 text-cyan-400">
+            <div class="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center">
+              <i class="fa-solid fa-flask-vial text-lg"></i>
+            </div>
+            <div>
+              <span class="text-[11px] uppercase tracking-wider font-extrabold text-cyan-400">⚡ Mid-Station Clinical Perturbation (25% Rubric Weight)</span>
+              <h3 id="pert-title" class="text-lg font-black text-white">Interim Clinical Finding</h3>
+            </div>
+          </div>
+          <button onclick="closePerturbationModal()" class="text-slate-400 hover:text-white p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="bg-slate-900/95 rounded-xl p-4 border border-slate-800 space-y-3">
+          <p id="pert-description" class="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium"></p>
+          <div id="pert-findings-list" class="space-y-1.5 text-xs font-mono bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-emerald-300">
+            <!-- Findings injected -->
+          </div>
+        </div>
+
+        <!-- Quick Hypothesis Shift Helper Chips -->
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] font-bold text-slate-400">1-Tap Hypothesis Shift Builders (Click to append to your reasoning):</span>
+          </div>
+          <div id="pert-hypotheses-chips" class="flex flex-wrap gap-1.5">
+            <!-- Injected by JS -->
+          </div>
+        </div>
+
+        <div class="space-y-2">
+          <label class="block text-xs font-bold text-slate-200">
+            🧠 Clinical Reasoning Pivot: How does this new data alter your diagnostic probabilities?
+          </label>
+          <textarea id="pert-reasoning-input" rows="3" placeholder="State which primary diagnosis is confirmed/reinforced (+2) and which differentials are ruled out (-2)..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"></textarea>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2.5">
+          <button onclick="closePerturbationModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs transition">
+            Return to History
+          </button>
+          <button onclick="submitPerturbationReasoning()" class="flex-1 py-3 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-black text-xs sm:text-sm transition shadow-lg">
+            Submit Probability Pivot &amp; Benchmark with Experts &rarr;
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- VIEW 4: POST-STATION EXAMINER VIVA & MANAGEMENT PLAN -->
+    <section id="viva-view" class="hidden max-w-3xl mx-auto w-full space-y-6">
+      <div class="glassmorphism rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-2xl space-y-5">
+        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-4">
+          <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-purple-600/20 border border-purple-500/30 flex items-center justify-center text-purple-400">
+              <i class="fa-solid fa-graduation-cap text-lg"></i>
+            </div>
+            <div>
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-purple-400">Phase 2: Rapid Viva &amp; Management Synthesis</span>
+              <h2 class="text-lg font-black text-white">Examiner Interrogation (Zero Bedside Fluff)</h2>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <span id="viva-progress" class="text-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 px-3 py-1 rounded-full font-bold">Question 1/3</span>
+          </div>
+        </div>
+
+        <div class="bg-emerald-950/30 border border-emerald-500/30 rounded-xl px-3.5 py-2 text-xs font-bold text-emerald-300 flex items-center justify-between">
+          <span>⚡ Blitz Rubric: 0% Bedside Fluff &bull; 100% Pure Clinical Reasoning &amp; Red Flags</span>
+          <button onclick="finishVivaImmediately()" class="text-[11px] underline text-amber-300 hover:text-amber-200">
+            Skip Remaining Viva &amp; Grade Now &rarr;
+          </button>
+        </div>
+
+        <!-- Examiner Question Card -->
+        <div class="bg-slate-900/95 rounded-xl p-5 border border-slate-800 space-y-3">
+          <div class="flex items-start space-x-3">
+            <div class="w-8 h-8 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400 shrink-0 mt-0.5">
+              <i class="fa-solid fa-user-tie text-sm"></i>
+            </div>
+            <div class="flex-1 space-y-2">
+              <div class="flex items-center justify-between">
+                <span class="text-xs font-bold text-purple-300 uppercase tracking-wider">Senior Consultant Examiner Prompt:</span>
+                <div class="flex items-center gap-2">
+                  <button onclick="toggleVivaRubricHint()" class="text-xs text-amber-300 hover:text-amber-200 bg-amber-500/15 px-2.5 py-1 rounded-lg border border-amber-500/30 font-semibold flex items-center space-x-1">
+                    <i class="fa-regular fa-lightbulb text-[10px]"></i>
+                    <span>Peek Key Points</span>
+                  </button>
+                  <button onclick="replayExaminerAudio()" id="replay-viva-btn" class="text-xs text-slate-400 hover:text-white bg-slate-800 px-2.5 py-1 rounded-lg flex items-center space-x-1">
+                    <i class="fa-solid fa-volume-high text-[10px]"></i>
+                    <span>Speak Prompt</span>
+                  </button>
+                </div>
+              </div>
+              <p id="viva-question-prompt" class="text-sm sm:text-base font-bold text-slate-100 leading-relaxed">
+                Loading viva question...
+              </p>
+              <!-- Optional Study Peek Box -->
+              <div id="viva-rubric-hint-box" class="hidden mt-3 p-3 rounded-xl bg-amber-950/30 border border-amber-500/30 text-xs text-amber-200 space-y-1.5">
+                <div class="font-bold text-amber-400 flex items-center justify-between">
+                  <span>🎯 Gold-Standard Viva Rubric Key Points:</span>
+                  <button onclick="fillVivaWithModelAnswer()" class="text-[11px] bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 px-2 py-0.5 rounded border border-amber-500/40 font-bold">
+                    ⚡ Auto-Fill Model Points
+                  </button>
+                </div>
+                <ul id="viva-hint-list" class="list-disc list-inside space-y-1 text-slate-300"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Candidate Viva Answer Box -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="block text-xs font-bold text-slate-300">Your Bullet-Point or Spoken Clinical Answer:</label>
+            <button onclick="toggleVivaVoiceInput()" id="viva-mic-btn" class="text-xs bg-slate-800 hover:bg-slate-700 text-rose-400 border border-rose-500/30 px-3 py-1 rounded-lg font-bold flex items-center space-x-1.5 transition">
+              <i class="fa-solid fa-microphone" id="viva-mic-icon"></i>
+              <span id="viva-mic-label">Dictate Answer</span>
+            </button>
+          </div>
+          <textarea id="viva-answer-input" rows="4" placeholder="Spam bullet points or key terms (e.g. 'working diagnosis, key differentials, bedside ECG/ABG, IV resuscitation, definitive intervention')..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3.5 text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-purple-500 font-medium"></textarea>
+        </div>
+
+        <div class="flex flex-wrap justify-between items-center gap-3 pt-1">
+          <button onclick="showView('consultation-view')" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition">
+            &larr; Back to Patient Findings
+          </button>
+          <button onclick="submitVivaAnswer()" class="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-black text-xs sm:text-sm transition shadow-lg shadow-purple-600/25 flex items-center space-x-2">
+            <span>Submit Viva Answer</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW 5: COMPREHENSIVE ZERO-FLUFF SCORECARD & AUDIT -->
+    <section id="scorecard-view" class="hidden max-w-4xl mx-auto w-full space-y-6">
+      <div class="glassmorphism rounded-2xl p-6 sm:p-8 border border-slate-800 shadow-2xl space-y-6">
+        <!-- Zero-Fluff Badge -->
+        <div class="flex flex-wrap items-center justify-between gap-2 bg-emerald-950/40 border border-emerald-500/30 rounded-xl px-4 py-2.5">
+          <span class="text-xs font-extrabold text-emerald-300">
+            ⚡ Blitz Rubric: 0% Bedside Fluff &bull; 100% Pure Clinical Reasoning &amp; Red Flags
+          </span>
+          <span class="text-[11px] font-mono text-slate-400">Weights: Red Flags 40% | Clinical Gates 20% | Diff &amp; Pivot 25% | Viva Plan 15%</span>
+        </div>
+
+        <!-- Header & Stamp -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+          <div>
+            <span class="text-xs uppercase tracking-wider font-bold text-slate-400">Official OSCEBlitz Diagnostic &amp; Safety Audit</span>
+            <h2 id="card-case-title" class="text-2xl font-black text-white mt-0.5">Station Title</h2>
+            <p id="card-candidate-name" class="text-xs text-slate-400 mt-1">Candidate: Dr. Noah Lim</p>
+          </div>
+          <div id="card-grade-badge" class="px-5 py-3 rounded-xl text-center font-black tracking-wide text-sm border shadow-lg">
+            GRADE
+          </div>
+        </div>
+
+        <!-- Safety Gate Alert -->
+        <div id="card-safety-alert" class="rounded-xl p-4 border text-xs sm:text-sm flex items-start space-x-3">
+          <!-- Dynamic safety pass/fail -->
+        </div>
+
+        <!-- Domain Scores Progress Bars (40% / 20% / 25% / 15%) -->
+        <div class="space-y-4">
+          <h3 class="text-sm font-black text-slate-200 uppercase tracking-wider">Zero-Fluff Clinical Reasoning Breakdown</h3>
+          <div id="card-domains-container" class="space-y-3.5">
+            <!-- Dynamic domains -->
+          </div>
+        </div>
+
+        <!-- Practicum Cognitive Traps -->
+        <div id="card-traps-section" class="space-y-3 hidden">
+          <h3 class="text-sm font-black text-amber-400 uppercase tracking-wider flex items-center space-x-2">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Practicum Script Cognitive Bias Audit</span>
+          </h3>
+          <div id="card-traps-container" class="space-y-2"></div>
+        </div>
+
+        <!-- Complete Gold-Standard Debrief (Differentials, Perturbation Rationale & Viva Model Answers) -->
+        <div class="space-y-3 bg-slate-900/90 p-5 rounded-2xl border border-slate-800">
+          <h3 class="text-xs font-black text-cyan-400 uppercase tracking-wider flex items-center space-x-2">
+            <i class="fa-solid fa-book-medical"></i>
+            <span>Gold-Standard Case Synthesis &amp; Viva Marking Key</span>
+          </h3>
+          <div id="card-model-answers-container" class="space-y-3 text-xs text-slate-300">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- Actionable Remediation -->
+        <div class="space-y-2 bg-slate-950 p-4 rounded-xl border border-slate-800">
+          <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider">Actionable Clinical Remediation:</h3>
+          <ul id="card-remediation-list" class="list-disc list-inside text-xs text-slate-400 space-y-1.5"></ul>
+        </div>
+
+        <!-- Footer Actions -->
+        <div class="flex flex-wrap justify-between items-center gap-3 pt-4 border-t border-slate-800">
+          <button onclick="showView('cases-view')" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition">
+            &larr; Blitz Another Station
+          </button>
+          <div class="flex gap-2">
+            <button onclick="copyMarkdownReport()" class="px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition flex items-center space-x-1.5">
+              <i class="fa-regular fa-copy"></i>
+              <span>Copy Markdown</span>
+            </button>
+            <button onclick="window.print()" class="px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition flex items-center space-x-1.5 shadow-sm">
+              <i class="fa-solid fa-print"></i>
+              <span>Print Audit</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- STANDALONE CASE DATA + HYBRID APP ENGINE -->
+  <script src="cases_data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

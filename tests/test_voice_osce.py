@@ -13,10 +13,12 @@ from unittest import mock
 # Keyword marking only, so results don't depend on a local LLM being up
 os.environ["VOICE_OSCE_LLM"] = "off"
 
-# Add project root to sys.path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Add project root and parent to sys.path so `import voice_osce` works from any cwd
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from voice_osce.cases import get_case, list_cases
+
+from voice_osce.cases import get_case, list_cases, CASE_LIBRARY, CASE_REGISTRY, SG_CLASSIC_IDS
 from voice_osce.cases.case_schema import GateCategory
 from voice_osce.engine.patient_agent import StandardizedPatientAgent
 from voice_osce.engine.practicum_engine import PracticumScriptEngine
@@ -29,11 +31,18 @@ class TestVoiceOSCE(unittest.TestCase):
 
     def test_01_case_registry(self):
         cases = list_cases()
-        self.assertGreaterEqual(len(cases), 3)
+        self.assertEqual(len(cases), 15)
+        self.assertEqual(len(CASE_LIBRARY), 15)
+        self.assertEqual(len(CASE_REGISTRY), 15)
         case_ids = [c["id"] for c in cases]
-        self.assertIn("cardio_01", case_ids)
-        self.assertIn("ortho_02", case_ids)
-        self.assertIn("neuro_03", case_ids)
+        for expected_id in [
+            "cardio_01", "ortho_02", "neuro_03", "resp_04", "gastro_05",
+            "obgyn_06", "psych_07", "peds_08", "ortho_09", "endo_10",
+            "id_11", "gastro_12", "ent_13", "med_14", "surg_15"
+        ]:
+            self.assertIn(expected_id, case_ids)
+        sg_cases = [c for c in cases if c.get("sg_classic")]
+        self.assertEqual(len(sg_cases), 5)
 
     def test_02_gated_disclosure_and_ice(self):
         case = get_case("ortho_02")
@@ -53,6 +62,17 @@ class TestVoiceOSCE(unittest.TestCase):
         reply3 = patient.respond("What are your main worries and expectations for this?")
         self.assertIn("ice_concerns_expectations", patient.unlocked_gate_keys)
         self.assertIn("championship", reply3.lower())
+
+    def test_02b_osceblitz_rapid_fire_burst(self):
+        case = get_case("id_11")
+        patient = StandardizedPatientAgent(case)
+        burst_q = "onset character radiation fever abdominal pain vomiting bleeding gums dizzy tekong mosquito panadol allergies?"
+        matched = patient._match_all_gates(burst_q)
+        self.assertGreaterEqual(len(matched), 5)
+        reply = patient.ask_patient_burst(burst_q)
+        self.assertEqual(len(patient.unlocked_gate_keys), 6)
+        self.assertIn("Pertinent Negatives", reply)
+        self.assertIn("NKDA", reply)
 
     def test_03_critical_safety_gate_enforcement(self):
         case = get_case("ortho_02")
@@ -74,6 +94,24 @@ class TestVoiceOSCE(unittest.TestCase):
         self.assertFalse(scorecard.safety_pass)
         self.assertEqual(scorecard.grade, "Critical Safety Fail")
         self.assertIn("Red Flag Bladder (red_flag)", scorecard.missed_safety_gates)
+
+    def test_03b_blitz_rubric_weights_no_ice_penalty(self):
+        case = get_case("cardio_01")
+        # Unlock all non-ICE gates, skip all ICE gates completely
+        non_ice_keys = {g.key for g in case.gates if g.category != GateCategory.ICE}
+        scorecard = RubricEvaluator.evaluate(
+            case=case,
+            unlocked_gate_keys=non_ice_keys,
+            viva_awarded=30.0,
+            viva_max=30.0,
+            concordance_score=100.0,
+            triggered_traps=[]
+        )
+        self.assertTrue(scorecard.safety_pass)
+        self.assertEqual([d.max_score for d in scorecard.domains], [40.0, 20.0, 25.0, 15.0])
+        self.assertEqual(scorecard.overall_percentage, 100.0)
+        self.assertEqual(scorecard.grade, "Pass with Distinction")
+
 
     def test_04_practicum_script_concordance(self):
         case = get_case("cardio_01")

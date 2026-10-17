@@ -98,7 +98,7 @@ class RubricEvaluator:
         viva_max: float,
         concordance_score: float,
         triggered_traps: List[CognitiveTrap],
-        candidate_name: str = "Dr. Noah Lim"
+        candidate_name: str = "Candidate"
     ) -> FinalScorecard:
         # 1. Mandatory Safety Gates Check (ICE gates never block safety or penalize marks)
         missed_safety: List[str] = []

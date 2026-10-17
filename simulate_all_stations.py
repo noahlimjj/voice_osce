@@ -90,7 +90,7 @@ def run_automated_simulation(case_id: str, script_turns: list[str], perturbation
         viva_max=viva_max,
         concordance_score=practicum.concordance_score or 75.0,
         triggered_traps=practicum.triggered_traps,
-        candidate_name="Dr. Noah Lim"
+        candidate_name="Candidate"
     )
 
     report_md = scorecard.to_markdown()

@@ -1,0 +1,35 @@
+[
+  {
+    "source": "Geeky Medics History Taking",
+    "url": "https://geekymedics.com/category/osce/history-taking/",
+    "status": "ok",
+    "extracted_topics": [
+      "Presenting a History &#8211; OSCE Guide",
+      "OSCE Stations",
+      "Real-Time Virtual Patients",
+      "Musculoskeletal History Taking",
+      "Constipation History Taking &#8211; OSCE Guide",
+      "Neurological History Taking &#8211; OSCE Guide",
+      "Chest Pain History",
+      "Memory Impairment History Taking &#8211; OSCE Guide",
+      "Gynaecological History Taking",
+      "Cardiovascular History Taking",
+      "Headache History Taking",
+      "Respiratory History Taking",
+      "Other pages",
+      "Join the community"
+    ]
+  },
+  {
+    "source": "LITFL Clinical Cases",
+    "url": "https://litfl.com/category/clinical-cases/",
+    "status": "offline_fallback (HTTP Error 403: Forbidden)",
+    "extracted_topics": []
+  },
+  {
+    "source": "Oxford Medical Education OSCE",
+    "url": "https://oxfordmedicaleducation.com/osce/",
+    "status": "offline_fallback (HTTP Error 404: Not Found)",
+    "extracted_topics": []
+  }
+]

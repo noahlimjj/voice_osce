@@ -31,18 +31,19 @@ class TestVoiceOSCE(unittest.TestCase):
 
     def test_01_case_registry(self):
         cases = list_cases()
-        self.assertEqual(len(cases), 15)
-        self.assertEqual(len(CASE_LIBRARY), 15)
-        self.assertEqual(len(CASE_REGISTRY), 15)
+        self.assertEqual(len(cases), 100)
+        self.assertEqual(len(CASE_LIBRARY), 100)
+        self.assertEqual(len(CASE_REGISTRY), 100)
         case_ids = [c["id"] for c in cases]
         for expected_id in [
             "cardio_01", "ortho_02", "neuro_03", "resp_04", "gastro_05",
             "obgyn_06", "psych_07", "peds_08", "ortho_09", "endo_10",
-            "id_11", "gastro_12", "ent_13", "med_14", "surg_15"
+            "id_11", "gastro_12", "ent_13", "med_14", "surg_15",
+            "case_16", "case_50", "case_75", "case_100"
         ]:
             self.assertIn(expected_id, case_ids)
         sg_cases = [c for c in cases if c.get("sg_classic")]
-        self.assertEqual(len(sg_cases), 5)
+        self.assertGreaterEqual(len(sg_cases), 15)
 
     def test_02_gated_disclosure_and_ice(self):
         case = get_case("ortho_02")

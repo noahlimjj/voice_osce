@@ -1,10 +1,9 @@
 """
-Registry of VoiceOSCE Clinical Cases.
-Comprehensive curriculum across core MBBS and Postgraduate Medical specialties.
+Registry of OSCEBlitz Clinical Cases (100 High-Yield MBBS & Singapore Medical School Stations).
 """
 
 import copy
-from typing import Dict, List
+from typing import Dict, List, Any
 from voice_osce.cases.case_schema import OSCECase
 from voice_osce.cases.cardiology_acs import CASE_CARDIOLOGY_ACS
 from voice_osce.cases.orthopedics_cauda import CASE_ORTHOPEDICS_CAUDA
@@ -23,8 +22,15 @@ from voice_osce.cases.sg_classics import (
     CASE_SG_HEATSTROKE,
     CASE_SG_MESENTERIC,
 )
+from voice_osce.cases.hundred_cases_bank import HUNDRED_CASES_LIST
+from voice_osce.cases.cases_36_to_55 import CASES_36_TO_55
+from voice_osce.cases.cases_56_to_100 import build_remaining_cases
 
-SG_CLASSIC_IDS = {"id_11", "gastro_12", "ent_13", "med_14", "surg_15"}
+SG_CLASSIC_IDS = {
+    "id_11", "gastro_12", "ent_13", "med_14", "surg_15",
+    "case_16", "case_17", "case_18", "case_19", "case_20",
+    "case_21", "case_22", "case_23", "case_24", "case_25", "case_71"
+}
 
 CASE_REGISTRY: Dict[str, OSCECase] = {
     "cardio_01": CASE_CARDIOLOGY_ACS,
@@ -44,6 +50,9 @@ CASE_REGISTRY: Dict[str, OSCECase] = {
     "surg_15": CASE_SG_MESENTERIC,
 }
 
+for _c in HUNDRED_CASES_LIST + CASES_36_TO_55 + build_remaining_cases():
+    CASE_REGISTRY[_c.case_id] = _c
+
 CASE_LIBRARY: Dict[str, OSCECase] = CASE_REGISTRY
 
 
@@ -54,7 +63,7 @@ def get_case(case_id: str) -> OSCECase:
     return copy.deepcopy(CASE_REGISTRY[case_id])
 
 
-def list_cases() -> List[Dict[str, object]]:
+def list_cases() -> List[Dict[str, Any]]:
     return [
         {
             "id": c.case_id,
@@ -67,4 +76,3 @@ def list_cases() -> List[Dict[str, object]]:
         }
         for c in CASE_REGISTRY.values()
     ]
-

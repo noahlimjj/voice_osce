@@ -53,7 +53,7 @@ app.add_middleware(
 
 
 class ActiveStationSession:
-    def __init__(self, case: OSCECase, candidate_name: str = "Dr. Noah Lim", session_id: Optional[str] = None):
+    def __init__(self, case: OSCECase, candidate_name: str = "Candidate", session_id: Optional[str] = None):
         self.session_id = session_id or str(uuid.uuid4())
         self.case = case
         self.candidate_name = candidate_name
@@ -86,7 +86,7 @@ def get_or_restore_session(
             case = get_case(case_id)
         except ValueError:
             raise HTTPException(status_code=404, detail=f"Case {case_id} not found.")
-        session = ActiveStationSession(case, candidate_name or "Dr. Noah Lim", session_id=session_id)
+        session = ActiveStationSession(case, candidate_name or "Candidate", session_id=session_id)
         SESSIONS[session_id] = session
 
     if unlocked_keys is not None:
@@ -110,7 +110,7 @@ def get_or_restore_session(
 # Pydantic Request Models
 class StartSessionRequest(BaseModel):
     case_id: str
-    candidate_name: Optional[str] = "Dr. Noah Lim"
+    candidate_name: Optional[str] = "Candidate"
 
 
 class TextQueryRequest(BaseModel):
@@ -213,7 +213,7 @@ def api_start_session(req: StartSessionRequest):
     except ValueError:
         raise HTTPException(status_code=404, detail=f"Case {req.case_id} not found.")
 
-    session = ActiveStationSession(case, req.candidate_name or "Dr. Noah Lim")
+    session = ActiveStationSession(case, req.candidate_name or "Candidate")
     SESSIONS[session.session_id] = session
 
     return {

@@ -47,6 +47,8 @@ class UniversalLLMClient:
         model: str = "gemini-2.5-flash"
     ) -> str:
         """Generate response across available backends."""
+        if os.environ.get("VOICE_OSCE_LLM", "").lower() == "off":
+            return ""  # Forced scripted / keyword mode (used by tests)
         # 1. Try Google GenAI SDK if API key available
         if self._genai_client:
             try:

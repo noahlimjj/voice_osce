@@ -8,7 +8,8 @@ import math
 import re
 from typing import List, Dict, Tuple
 from voice_osce.cases.case_schema import OSCECase, VivaQuestion
-from voice_osce.engine.speech_synthesizer import SpeechSynthesizer
+from voice_osce.engine.llm_marker import judge_items
+from voice_osce.engine.practicum_engine import stem
 
 
 class ExaminerAgent:
@@ -34,7 +35,7 @@ class ExaminerAgent:
         terms = [t for t in re.findall(r"[a-z0-9]+", key_point.lower()) if len(t) > 2 and t not in cls._STOPWORDS]
         if not terms:
             return False
-        hits = sum(1 for t in terms if any(w.startswith(t[:6]) for w in answer_words))
+        hits = sum(1 for t in terms if any(w.startswith(stem(t)) for w in answer_words))
         needed = 1 if len(terms) == 1 else (2 if len(terms) <= 4 else max(2, math.ceil(len(terms) * 0.3)))
         return hits >= needed
 
@@ -52,10 +53,13 @@ class ExaminerAgent:
         text_lower = candidate_answer.lower()
         matched_points: List[str] = []
 
-        answer_words = re.findall(r"[a-z0-9]+", text_lower)
-        for kp in q.key_points_required:
-            if self._key_point_covered(kp, answer_words):
-                matched_points.append(kp)
+        # Prefer semantic LLM marking; fall back to keyword marking when no LLM is available
+        covered = judge_items(q.prompt, candidate_answer, q.key_points_required)
+        if covered is not None:
+            matched_points = [kp for i, kp in enumerate(q.key_points_required) if i in covered]
+        else:
+            answer_words = re.findall(r"[a-z0-9]+", text_lower)
+            matched_points = [kp for kp in q.key_points_required if self._key_point_covered(kp, answer_words)]
 
         # Proportion of key points matched
         score_ratio = len(matched_points) / max(1, len(q.key_points_required))

@@ -116,3 +116,6 @@ Without an LLM the patient answers from scripted, gated responses. To get free-f
 | `OLLAMA_URL` | Ollama server to use if reachable | `http://localhost:11434` |
 | `OLLAMA_MODEL` | Ollama model name | `mistral` |
 | `OLLAMA_TIMEOUT` | Seconds to wait for a reply | `60` |
+| `VOICE_OSCE_LLM` | Set to `off` to force scripted patient + keyword marking | unset |
+
+When an LLM is available it also marks viva answers and perturbation reasoning semantically (synonyms and paraphrases count); otherwise a keyword marker is used.

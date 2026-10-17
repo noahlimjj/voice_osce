@@ -327,7 +327,9 @@ def api_get_scorecard(session_id: str):
         viva_max=viva_max,
         # No free marks: an unanswered perturbation scores 0
         concordance_score=session.practicum_engine.concordance_score,
-        triggered_traps=session.practicum_engine.final_traps(unlocked),
+        triggered_traps=session.practicum_engine.final_traps(
+            unlocked, " ".join(ans for _, ans in session.examiner_agent.transcript)
+        ),
         candidate_name=session.candidate_name
     )
 

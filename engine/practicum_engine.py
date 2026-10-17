@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from typing import Dict, List, Optional, Set, Tuple
 from voice_osce.cases.case_schema import OSCECase, CognitiveTrap
+from voice_osce.engine.llm_marker import judge_items
 
 # Words too generic to identify a specific hypothesis
 _HYPOTHESIS_STOPWORDS = {
@@ -29,6 +30,18 @@ _POSITIVE_SHIFT_RE = re.compile(
 )
 
 
+_SUFFIXES = ("ically", "ation", "ating", "ously", "ities", "ical", "ing", "ous", "ity", "ies", "ic", "al", "ed", "es", "y", "s")
+
+
+def stem(word: str) -> str:
+    """Crude suffix stripper so word forms line up ("gouty"/"gout", "septic"/"sepsis" stays distinct)."""
+    w = word.lower()
+    for suf in _SUFFIXES:
+        if w.endswith(suf) and len(w) - len(suf) >= 4:
+            return w[: -len(suf)]
+    return w
+
+
 def split_clauses(text: str) -> List[str]:
     """Split free text into short clauses so cues are attributed to the right hypothesis."""
     parts = re.split(r"[.;!?,\n]|\band\b|\bbut\b|\bwhereas\b|\bwhile\b", text.lower())
@@ -43,7 +56,8 @@ def _hypothesis_terms(hypothesis: str) -> List[str]:
     if 2 <= len(head_terms) <= 3:
         terms.append("".join(w[0] for w in head_terms))
     # Term patterns: prefix match for words, exact match for the initialism
-    return [r"\b" + re.escape(t) + (r"\b" if i == len(terms) - 1 and 2 <= len(head_terms) <= 3 else "")
+    has_initialism = 2 <= len(head_terms) <= 3
+    return [r"\b" + (re.escape(t) + r"\b" if has_initialism and i == len(terms) - 1 else re.escape(stem(t)))
             for i, t in enumerate(terms)]
 
 
@@ -62,18 +76,23 @@ def detect_traps(
     case: OSCECase,
     reasoning_text: Optional[str],
     unlocked_gate_keys: Set[str],
+    full_text: Optional[str] = None,
 ) -> List[CognitiveTrap]:
-    """Apply each trap's detection rules. Text-based rules only run when reasoning text exists."""
+    """Apply each trap's detection rules.
+
+    reasoning_text: the perturbation answer (commission errors like "give GTN").
+    full_text: everything the candidate said incl. viva; omission traps are only judged on this,
+    at scoring time, so a management step mentioned in the viva still counts.
+    """
     triggered: List[CognitiveTrap] = []
     for trap in case.cognitive_traps:
         fired = False
         if trap.missed_gate_keys and not any(k in unlocked_gate_keys for k in trap.missed_gate_keys):
             fired = True
-        if reasoning_text:
-            text_lower = reasoning_text.lower()
-            if trap.trigger_keywords and keyword_hit(reasoning_text, trap.trigger_keywords):
-                fired = True
-            if trap.absent_keywords and not any(k.lower() in text_lower for k in trap.absent_keywords):
+        if reasoning_text and trap.trigger_keywords and keyword_hit(reasoning_text, trap.trigger_keywords):
+            fired = True
+        if full_text and trap.absent_keywords:
+            if not any(k.lower() in full_text.lower() for k in trap.absent_keywords):
                 fired = True
         if fired:
             triggered.append(trap)
@@ -120,6 +139,24 @@ class PracticumScriptEngine:
         matched_points: List[str] = []
         scored = {h: v for h, v in self.case.perturbation.expected_shifts.items() if v != 0}
 
+        # Semantic LLM judgement when available; deterministic clause matching otherwise
+        items = [
+            f"{h} is {'reinforced/confirmed' if v > 0 else 'weakened/ruled out'} by the new findings"
+            for h, v in scored.items()
+        ]
+        p = self.case.perturbation
+        question = f"{p.title}: {p.description} Findings: {p.findings}. How do these alter the differential?"
+        covered = judge_items(question, candidate_response, items)
+        if covered is not None:
+            for i, (h, v) in enumerate(scored.items()):
+                if i in covered:
+                    matched_points.append(
+                        f"Correctly identified that {h} is reinforced." if v > 0
+                        else f"Correctly recognized that {h} is weakened or ruled out.")
+            self.concordance_score = round(100.0 * len(covered) / max(1, len(scored)), 1)
+            self.triggered_traps = detect_traps(self.case, candidate_response, unlocked_gate_keys)
+            return self.concordance_score, matched_points, self.triggered_traps
+
         hits = 0
         for hypothesis, expected_val in scored.items():
             terms = _hypothesis_terms(hypothesis)
@@ -141,7 +178,8 @@ class PracticumScriptEngine:
         self.triggered_traps = detect_traps(self.case, candidate_response, unlocked_gate_keys)
         return self.concordance_score, matched_points, self.triggered_traps
 
-    def final_traps(self, unlocked_gate_keys: Set[str]) -> List[CognitiveTrap]:
+    def final_traps(self, unlocked_gate_keys: Set[str], viva_text: str = "") -> List[CognitiveTrap]:
         """Re-evaluate traps at scoring time (history-gate traps apply even without a perturbation answer)."""
-        self.triggered_traps = detect_traps(self.case, self.reasoning_text, unlocked_gate_keys)
+        full_text = " ".join(t for t in (self.reasoning_text, viva_text) if t)
+        self.triggered_traps = detect_traps(self.case, self.reasoning_text, unlocked_gate_keys, full_text or None)
         return self.triggered_traps

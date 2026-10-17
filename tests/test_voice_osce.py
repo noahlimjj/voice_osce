@@ -4,9 +4,14 @@ Validates case definitions, gated disclosure state machine, Practicum Script cog
 and safety failure assertions.
 """
 
+import os
 import sys
 import unittest
 from pathlib import Path
+from unittest import mock
+
+# Keyword marking only, so results don't depend on a local LLM being up
+os.environ["VOICE_OSCE_LLM"] = "off"
 
 # Add project root to sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -130,6 +135,29 @@ class TestVoiceOSCE(unittest.TestCase):
         awarded, matched, summary = examiner.evaluate_answer(ans1)
         self.assertGreaterEqual(awarded, 5.0)
         self.assertGreater(len(matched), 1)
+
+    def test_05c_word_forms_match(self):
+        engine = PracticumScriptEngine(get_case("ortho_09"))
+        _, matched, _ = engine.evaluate_reasoning_shift("Septic arthritis confirmed. Gout is now unlikely.", set())
+        self.assertTrue(any("Gouty" in m for m in matched))
+
+    def test_05d_llm_marker_used_when_available(self):
+        examiner = ExaminerAgent(get_case("cardio_01"))
+        with mock.patch("voice_osce.engine.llm_client.UniversalLLMClient.generate",
+                        return_value='{"covered": [1, 3]}'), \
+             mock.patch.dict(os.environ, {"VOICE_OSCE_LLM": ""}):
+            awarded, matched, _ = examiner.evaluate_answer("anything")
+        self.assertEqual(len(matched), 2)
+        self.assertEqual(awarded, 5.0)
+
+    def test_05e_omission_trap_cleared_by_viva(self):
+        engine = PracticumScriptEngine(get_case("gastro_05"))
+        engine.evaluate_reasoning_shift("Variceal bleed likely.", set())
+        names = lambda ts: [t.trap_name for t in ts]
+        self.assertIn("Omission of Prophylactic Antibiotics in Cirrhotic Bleed",
+                      names(engine.final_traps(set(), "")))
+        self.assertNotIn("Omission of Prophylactic Antibiotics in Cirrhotic Bleed",
+                         names(engine.final_traps(set(), "Start IV ceftriaxone and terlipressin.")))
 
     def test_06_neural_tts_generation(self):
         synth = get_synthesizer()

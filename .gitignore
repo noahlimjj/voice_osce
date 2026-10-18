@@ -38,3 +38,6 @@ temp_*
 .DS_Store
 Thumbs.db
 .env
+
+.vercel
+.env*

@@ -1,35 +1,10 @@
 {
-  "version": 2,
-  "builds": [
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
+  "rewrites": [
     {
-      "src": "api/index.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "web/static/**",
-      "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.py"
-    },
-    {
-      "src": "/static/(.*)",
-      "dest": "/web/static/$1"
-    },
-    {
-      "src": "/(app\\.js|cases_data\\.js|manifest\\.json|icon-512\\.png|index\\.html)",
-      "dest": "/web/static/$1"
-    },
-    {
-      "src": "/",
-      "dest": "/web/static/index.html"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/api/index.py"
+      "source": "/api/(.*)",
+      "destination": "/api/index.py"
     }
   ]
 }

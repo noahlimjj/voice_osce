@@ -19,11 +19,20 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-# Ensure project root is in sys.path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# Ensure project root is in sys.path and self-bootstrap voice_osce package
+import types
+_ROOT = Path(__file__).resolve().parent
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+if str(_ROOT.parent) not in sys.path:
+    sys.path.insert(0, str(_ROOT.parent))
+if "voice_osce" not in sys.modules:
+    _pkg = types.ModuleType("voice_osce")
+    _pkg.__path__ = [str(_ROOT)]
+    sys.modules["voice_osce"] = _pkg
 
 import uvicorn
-from voice_osce.web.server import app
+from web.server import app
 
 
 def open_browser(url: str, delay_sec: float = 1.2):

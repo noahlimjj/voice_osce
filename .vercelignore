@@ -1,7 +1,5 @@
-.pytest_cache
 __pycache__
 *.pyc
-tests
 .git
 .venv
 venv

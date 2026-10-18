@@ -440,33 +440,40 @@ def api_get_scorecard(
 
 # Mount Static Files
 static_dir = Path(__file__).parent / "static"
+
+def _resolve_static_file(filename: str) -> Path:
+    p = static_dir / filename
+    if p.exists():
+        return p
+    return _REPO_ROOT / filename
+
 if static_dir.exists():
     app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
-    @app.get("/cases_data.js")
-    def serve_cases_js():
-        return FileResponse(str(static_dir / "cases_data.js"), media_type="application/javascript")
+@app.get("/cases_data.js")
+def serve_cases_js():
+    return FileResponse(str(_resolve_static_file("cases_data.js")), media_type="application/javascript")
 
-    @app.get("/app.js")
-    def serve_app_js():
-        return FileResponse(str(static_dir / "app.js"), media_type="application/javascript")
+@app.get("/app.js")
+def serve_app_js():
+    return FileResponse(str(_resolve_static_file("app.js")), media_type="application/javascript")
 
-    @app.get("/manifest.json")
-    def serve_manifest_json():
-        manifest_path = static_dir / "manifest.json"
-        if manifest_path.exists():
-            return FileResponse(str(manifest_path), media_type="application/manifest+json")
-        return JSONResponse({"name": "OSCEBlitz", "short_name": "OSCEBlitz", "start_url": "/", "display": "standalone"})
+@app.get("/manifest.json")
+def serve_manifest_json():
+    p = _resolve_static_file("manifest.json")
+    if p.exists():
+        return FileResponse(str(p), media_type="application/manifest+json")
+    return JSONResponse({"name": "OSCEBlitz", "short_name": "OSCEBlitz", "start_url": "/", "display": "standalone"})
 
-    @app.get("/icon-512.png")
-    def serve_icon_512():
-        icon_path = static_dir / "icon-512.png"
-        if icon_path.exists():
-            return FileResponse(str(icon_path), media_type="image/png")
-        raise HTTPException(status_code=404, detail="Icon not found")
+@app.get("/icon-512.png")
+def serve_icon_512():
+    p = _resolve_static_file("icon-512.png")
+    if p.exists():
+        return FileResponse(str(p), media_type="image/png")
+    raise HTTPException(status_code=404, detail="Icon not found")
 
-    @app.get("/", response_class=HTMLResponse)
-    def serve_index():
-        index_file = static_dir / "index.html"
-        return index_file.read_text(encoding="utf-8")
+@app.get("/", response_class=HTMLResponse)
+def serve_index():
+    p = _resolve_static_file("index.html")
+    return p.read_text(encoding="utf-8")
 

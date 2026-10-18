@@ -11,6 +11,11 @@ from voice_osce.cases.case_schema import (
 )
 
 
+def _dedupe(words: List[str]) -> List[str]:
+    """Drop repeated trigger words (case-insensitive) while keeping their order."""
+    return list(dict.fromkeys(w.strip().lower() for w in words if w and w.strip()))
+
+
 def make_station(
     case_id: str,
     specialty: str,
@@ -59,7 +64,127 @@ def make_station(
     trap_desc: str,
     trap_cond: str,
     trap_rem: str,
+    sec_ref: List[str] = None,
+    rf3_key: str = None,
+    rf3_trig: List[str] = None,
+    rf3_resp: str = None,
+    extra_gates: List[InformationGate] = None,
+    omit_ice: bool = False,
+    omit_social: bool = False,
+    viva3_q: str = None,
+    viva3_rubric: str = None,
+    viva3_keys: List[str] = None,
+    has_perturbation: bool = True,
 ) -> OSCECase:
+    gates = [
+        InformationGate(
+            key="hpi_socrates",
+            category=GateCategory.SOCRATES,
+            trigger_concepts=_dedupe(socrates_trig + ["start", "onset", "when", "describe", "character", "pain", "symptoms", "long", "where", "severity"]),
+            response_text=socrates_resp,
+            mandatory_for_safety=False,
+        ),
+        InformationGate(
+            key=rf1_key,
+            category=GateCategory.RED_FLAG,
+            trigger_concepts=_dedupe(rf1_trig),
+            response_text=rf1_resp,
+            mandatory_for_safety=True,
+        ),
+        InformationGate(
+            key=rf2_key,
+            category=GateCategory.RED_FLAG,
+            trigger_concepts=_dedupe(rf2_trig),
+            response_text=rf2_resp,
+            mandatory_for_safety=True,
+        ),
+    ]
+    if rf3_key and rf3_trig and rf3_resp:
+        gates.append(
+            InformationGate(
+                key=rf3_key,
+                category=GateCategory.RED_FLAG,
+                trigger_concepts=_dedupe(rf3_trig),
+                response_text=rf3_resp,
+                mandatory_for_safety=True,
+            )
+        )
+    gates.append(
+        InformationGate(
+            key="pmhx_drugs_allergies",
+            category=GateCategory.PAST_HISTORY,
+            trigger_concepts=_dedupe(pmhx_trig + ["past medical", "history", "conditions", "medications", "drugs", "tablets", "allergies", "allergy"]),
+            response_text=pmhx_resp,
+            mandatory_for_safety=False,
+        )
+    )
+    if not omit_social:
+        gates.append(
+            InformationGate(
+                key="social_epi_history",
+                category=GateCategory.SOCIAL_HISTORY,
+                trigger_concepts=_dedupe(social_trig + ["smoke", "alcohol", "occupation", "work", "travel", "family", "home", "diet"]),
+                response_text=social_resp,
+                mandatory_for_safety=False,
+            )
+        )
+    if not omit_ice:
+        gates.append(
+            InformationGate(
+                key="ice_concerns",
+                category=GateCategory.ICE,
+                trigger_concepts=["worry", "worried", "concern", "expect", "think", "afraid", "scared", "ideas"],
+                response_text=ice_resp,
+                mandatory_for_safety=False,
+            )
+        )
+    if extra_gates:
+        gates.extend(extra_gates)
+
+    pert = None
+    if has_perturbation and pert_desc:
+        pert = PerturbationData(
+            trigger_turn=3,
+            title=pert_title,
+            description=pert_desc,
+            findings=pert_findings,
+            expected_shifts=pert_shifts,
+            expert_rationale=pert_rationale,
+        )
+    else:
+        pert = PerturbationData(
+            trigger_turn=99,
+            title="Stable Bedside Status",
+            description="",
+            findings={},
+            expected_shifts={},
+            expert_rationale="",
+        )
+
+    vivas = [
+        VivaQuestion(
+            prompt=viva1_q,
+            target_rubric=viva1_rubric,
+            max_marks=10 if viva3_q else 15,
+            key_points_required=viva1_keys,
+        ),
+        VivaQuestion(
+            prompt=viva2_q,
+            target_rubric=viva2_rubric,
+            max_marks=10 if viva3_q else 15,
+            key_points_required=viva2_keys,
+        ),
+    ]
+    if viva3_q and viva3_rubric and viva3_keys:
+        vivas.append(
+            VivaQuestion(
+                prompt=viva3_q,
+                target_rubric=viva3_rubric,
+                max_marks=10,
+                key_points_required=viva3_keys,
+            )
+        )
+
     return OSCECase(
         case_id=case_id,
         specialty=specialty,
@@ -85,58 +210,8 @@ def make_station(
             temperament="anxious",
             behavioral_cues=cues,
         ),
-        gates=[
-            InformationGate(
-                key="hpi_socrates",
-                category=GateCategory.SOCRATES,
-                trigger_concepts=socrates_trig + ["start", "onset", "when", "describe", "character", "pain", "symptoms", "long", "where", "severity"],
-                response_text=socrates_resp,
-                mandatory_for_safety=False,
-            ),
-            InformationGate(
-                key=rf1_key,
-                category=GateCategory.RED_FLAG,
-                trigger_concepts=rf1_trig,
-                response_text=rf1_resp,
-                mandatory_for_safety=True,
-            ),
-            InformationGate(
-                key=rf2_key,
-                category=GateCategory.RED_FLAG,
-                trigger_concepts=rf2_trig,
-                response_text=rf2_resp,
-                mandatory_for_safety=True,
-            ),
-            InformationGate(
-                key="pmhx_drugs_allergies",
-                category=GateCategory.PAST_HISTORY,
-                trigger_concepts=pmhx_trig + ["past medical", "history", "conditions", "medications", "drugs", "tablets", "allergies", "allergy"],
-                response_text=pmhx_resp,
-                mandatory_for_safety=True,
-            ),
-            InformationGate(
-                key="social_epi_history",
-                category=GateCategory.SOCIAL_HISTORY,
-                trigger_concepts=social_trig + ["smoke", "alcohol", "occupation", "work", "travel", "family", "home", "diet"],
-                response_text=social_resp,
-                mandatory_for_safety=False,
-            ),
-            InformationGate(
-                key="ice_concerns",
-                category=GateCategory.ICE,
-                trigger_concepts=["worry", "worried", "concern", "expect", "think", "afraid", "scared", "ideas"],
-                response_text=ice_resp,
-                mandatory_for_safety=False,
-            ),
-        ],
-        perturbation=PerturbationData(
-            trigger_turn=3,
-            title=pert_title,
-            description=pert_desc,
-            findings=pert_findings,
-            expected_shifts=pert_shifts,
-            expert_rationale=pert_rationale,
-        ),
+        gates=gates,
+        perturbation=pert,
         differentials=[
             Differential(
                 name=primary_dx,
@@ -158,25 +233,12 @@ def make_station(
                 name=sec_dx,
                 tier=DifferentialTier.SECONDARY,
                 supporting_features=sec_sup,
-                refuting_features=["Excluded by definitive bedside/imaging perturbation findings"],
+                refuting_features=list(sec_ref or []),
                 prior_probability=0.10,
                 posterior_probability=0.01,
             ),
         ],
-        viva_questions=[
-            VivaQuestion(
-                prompt=viva1_q,
-                target_rubric=viva1_rubric,
-                max_marks=15,
-                key_points_required=viva1_keys,
-            ),
-            VivaQuestion(
-                prompt=viva2_q,
-                target_rubric=viva2_rubric,
-                max_marks=15,
-                key_points_required=viva2_keys,
-            ),
-        ],
+        viva_questions=vivas,
         cognitive_traps=[
             CognitiveTrap(
                 trap_name=trap_name,
@@ -560,7 +622,7 @@ HUNDRED_CASES_LIST: List[OSCECase] = [
         socrates_trig=["urine", "yellow", "jaundice", "tired", "dizzy", "back pain"],
         socrates_resp="Yesterday I noticed my eyes turned bright yellow and I felt breathless just climbing one flight of stairs. My urine turned dark brownish-black like soy sauce, and my lower back aches.",
         rf1_key="red_flag_oxidant_drug_fava",
-        rf1_trig=["antibiotic", "drug", "medication", "bactrim", "sulfa", "fava", "broad beans", "mothballs", "boil"],
+        rf1_trig=["antibiotic", "bactrim", "septrin", "co-trimoxazole", "sulfa", "sulfonamide", "fava", "fava beans", "broad beans", "mothballs", "boil"],
         rf1_resp="Three days ago a GP gave me Bactrim (Co-trimoxazole) for an infected boil on my thigh, and I also ate a snack pack of roasted broad beans (fava beans) while watching football!",
         rf2_key="red_flag_anemia_hypoxia_aki",
         rf2_trig=["chest pain", "faint", "syncope", "breathless", "urine output"],
@@ -838,63 +900,90 @@ HUNDRED_CASES_LIST: List[OSCECase] = [
         trap_rem="Transarterial Embolization (TAE) is the gold-standard immediate haemostatic intervention for ruptured HCC."
     ),
 
-    # 27. Anterior STEMI + Cardiogenic Shock (Cardiology)
+    # 27. Multifactorial Falls & Orthostatic Hypotension (Geriatric Medicine)
     make_station(
         case_id="case_27",
-        specialty="Cardiology / Acute Medicine",
-        title="Extensive Anterior STEMI Complicated by Cardiogenic Shock (Killip Class IV)",
-        setting="National Heart Centre Singapore (NHCS) / SGH ED Resus",
-        patient_name="Mr. Ahmad Bin Yusof",
-        age=63,
-        gender="Male",
-        occupation="Bus Captain",
-        complaint="3 hours of crushing central chest pain, severe breathlessness, cold clammy skin, and dizziness",
-        vitals={"Heart Rate": "118 bpm", "Blood Pressure": "76/50 mmHg", "Respiratory Rate": "32 /min", "Oxygen Saturation": "88% on room air", "Temperature": "36.1°C", "JVP": "Elevated at +6 cm, bibasal pulmonary crackles"},
-        voice_id="en-SG-WayneNeural",
-        cues=["Grey, diaphoretic, cold mottled extremities (wet-cold phenotype)", "Audible S3 gallop and bibasal inspiratory crepitations to mid-zones"],
-        socrates_trig=["chest", "pain", "heavy", "arm", "breathless"],
-        socrates_resp="A crushing vice clamped down on my chest 3 hours ago, shooting down my left arm. Now I feel like I'm drowning when I lie flat!",
-        rf1_key="red_flag_cardiogenic_shock_hypoperfusion",
-        rf1_trig=["dizzy", "cold", "urine", "orthopnea", "pink frothy", "cough"],
-        rf1_resp="My hands and feet are ice-cold, I'm coughing up frothy phlegm, and I feel like passing out.",
-        rf2_key="red_flag_dissection_screen",
-        rf2_trig=["tearing", "back", "shoulder blades", "bleeding", "stroke"],
-        rf2_resp="Not tearing to the back, and no recent surgeries or strokes.",
-        pmhx_trig=["diabetes", "hypertension", "cholesterol", "stent"],
-        pmhx_resp="Type 2 Diabetes, hypertension, and high cholesterol. Stopped taking my statin and aspirin 6 months ago. NKDA.",
-        social_trig=["smoke", "bus"],
-        social_resp="40-pack-year smoker.",
-        ice_resp="Please save me, doctor, I can't breathe!",
-        pert_title="12-Lead ECG, ABG & Bedside Echocardiogram",
-        pert_desc="Immediate resuscitation bay ECG and echo show:",
+        specialty="Geriatric Medicine",
+        title="Multifactorial Falls, Polypharmacy & Orthostatic Hypotension in an 82yo Woman",
+        setting="Tan Tock Seng Hospital (TTSH) Falls & Balance Clinic / ED",
+        patient_name="Mdm. Tan Geok Lan",
+        age=82,
+        gender="Female",
+        occupation="Retiree",
+        complaint="3 falls over the past 2 months, lightheadedness and unsteadiness upon standing from bed",
+        vitals={
+            "Heart Rate": "74 bpm",
+            "Blood Pressure (Lying)": "154/82 mmHg",
+            "Blood Pressure (Standing 3 min)": "116/62 mmHg (Drop 38/20 mmHg: Orthostatic Hypotension)",
+            "Respiratory Rate": "16 /min",
+            "Oxygen Saturation": "98% on room air",
+            "Temperature": "36.6°C",
+            "Timed Up and Go (TUG)": "22 seconds (High Fall Risk >12s)"
+        },
+        voice_id="en-SG-LunaNeural",
+        cues=["Stooped posture, cautious broad-based gait using an umbrella as an improvised walking stick", "Bruising on left forearm from fall yesterday, no hip tenderness"],
+        socrates_trig=["falls", "dizzy", "lightheaded", "standing", "unsteady", "blackout", "tripped"],
+        socrates_resp="Over the last two months I've had three falls at home. Every morning when I get out of bed, the room goes dim and my legs feel weak.",
+        rf1_key="rf_orthostatic_polypharmacy",
+        rf1_trig=["medications", "pills", "amlodipine", "hydrochlorothiazide", "amitriptyline", "zolpidem", "sedative", "sleeping tablet", "water pill"],
+        rf1_resp="I take Amlodipine, Hydrochlorothiazide, Amitriptyline for nerve pain, and Zolpidem for sleep. My daughter noticed I stagger right after taking my morning pills.",
+        rf2_key="rf_syncope_head_injury_anticoag",
+        rf2_trig=["hit head", "loss of consciousness", "blackout", "headache", "vomit", "warfarin", "blood thinner", "anticoagulant", "chest pain", "palpitations"],
+        rf2_resp="I did not hit my head, no loss of consciousness or palpitations, no headache or vomiting, and I do not take blood thinners like warfarin.",
+        pmhx_trig=["hypertension", "osteoporosis", "stroke", "diabetes", "arthritis"],
+        pmhx_resp="Hypertension, knee osteoarthritis, osteoporosis, and insomnia. No prior stroke or heart attack. NKDA.",
+        social_trig=["home", "stairs", "live", "flat", "daughter", "toilet"],
+        social_resp="Lives in a 3-room HDB flat with daughter. Uses reading glasses for walking; loose rugs in the hallway and no grab bars in the toilet.",
+        ice_resp="I am terrified of breaking my hip and becoming bedridden, doctor. Can you help me walk safely?",
+        pert_title="Postural Vitals, 12-Lead ECG & Basic Blood Panel",
+        pert_desc="Bedside orthostatic testing and bloods confirm:",
         pert_findings={
-            "12-Lead ECG": "4 mm Tombstone ST-segment elevation across V1–V6, I, and aVL (Extensive Anterolateral STEMI — Proximal LAD occlusion).",
-            "Bedside Echo": "LVEF 20% with severe anterior/apical akinesis; no pericardial tamponade or acute MR.",
-            "Lactate": "5.2 mmol/L."
+            "Postural BP": "Lying BP 154/82 mmHg -> Standing 3-min BP 116/62 mmHg (Drop 38/20 mmHg = Severe Orthostatic Hypotension).",
+            "12-Lead ECG": "Normal sinus rhythm 72 bpm, normal PR and QTc intervals, no AV block or ischaemia.",
+            "Bloods": "Hb 12.2 g/dL, Na+ 134 mmol/L, K+ 3.6 mmol/L, Creatinine 82 umol/L, eGFR 64, Corrected Calcium 2.22 mmol/L, 25-OH Vitamin D 14 ng/mL (Deficiency)."
         },
         pert_shifts={
-            "Extensive Anterolateral STEMI with Cardiogenic Shock (Killip IV)": 2,
-            "Acute Aortic Dissection": -2,
-            "Massive Pulmonary Embolism": -2
+            "Multifactorial Falls with Drug-Induced Orthostatic Hypotension": 2,
+            "Cardiogenic Syncope (Sick Sinus Syndrome / Arrhythmia)": -2,
+            "Acute Intracranial Subdural Haematoma": -2
         },
-        pert_rationale="Proximal Left Anterior Descending (LAD) occlusion causing extensive anterolateral STEMI and Killip Class IV cardiogenic shock ('Cold & Wet': CI <2.2, PCWP >18). Requires emergent Primary PCI of the culprit LAD only (CULPRIT-SHOCK trial), Noradrenaline + Dobutamine support, and strict avoidance of acute beta-blockers or large fluid boluses!",
-        primary_dx="Extensive Anterolateral STEMI Complicated by Cardiogenic Shock (Killip IV)",
-        primary_sup=["Tombstone ST elevation V1-V6, I, aVL (proximal LAD occlusion)", "Killip Class IV: hypotension (76/50), pulmonary oedema, LVEF 20%, lactate 5.2"],
-        mnm_dx="Mechanical Complication of MI (Papillary Muscle Rupture / VSD / Free Wall Rupture)",
-        mnm_sup=["Hypotension and pulmonary oedema during acute MI"],
-        mnm_ref=["Bedside echo excludes acute severe mitral regurgitation, VSD shunt, or tamponade"],
-        sec_dx="Massive Pulmonary Embolism",
-        sec_sup=["Acute chest pain, hypoxia, shock"],
-        viva1_q="Define the Killip Classification of acute myocardial infarction and state which class this patient belongs to.",
-        viva1_rubric="Killip I: No clinical signs of heart failure (mortality ~6%); Killip II: Bibasal rales/crackles (<50% lung fields), S3 gallop, elevated JVP; Killip III: Frank acute pulmonary oedema (>50% lung fields); Killip IV: Cardiogenic shock (SBP <90 mmHg with end-organ hypoperfusion: oliguria, cold extremities, lactate >2). This patient is in Killip Class IV.",
-        viva1_keys=["Killip I-IV definitions", "Patient is in Killip Class IV (Cardiogenic Shock + Pulmonary Oedema)", "Proximal LAD ('Widowmaker') occlusion on ECG (V1-V6, I, aVL)"],
-        viva2_q="How will you manage this patient's haemodynamics and revascularization, and which standard ACS drugs are contraindicated right now?",
-        viva2_rubric="1. Immediate Cath Lab activation for emergency Primary PCI of the culprit proximal LAD only (per CULPRIT-SHOCK trial—do not perform routine immediate multivessel PCI in shock); 2. Dual antiplatelets: Aspirin 300mg + Ticagrelor 180mg + IV Heparin; 3. Haemodynamic support: First-line vasopressor Noradrenaline to restore MAP >=65 mmHg + Inotrope Dobutamine once SBP >80-90; oxygen/ventilatory support; 4. STRICTLY CONTRAINDICATED acutely: Oral/IV Beta-blockers (precipitate fatal pump failure!), Nitrates (worsen hypotension), and aggressive IV fluid boluses (worsen pulmonary oedema).",
-        viva2_keys=["Emergent Primary PCI of culprit LAD vessel only (CULPRIT-SHOCK trial)", "DAPT (Aspirin 300mg + Ticagrelor 180mg) + Anticoagulation", "Noradrenaline (vasopressor) + Dobutamine (inotrope) support", "CONTRAINDICATED acutely: Beta-blockers, Nitrates, and large IV fluid boluses"],
-        trap_name="Giving Acute Beta-Blockers or Large Fluid Boluses in Killip IV Anterior STEMI",
-        trap_desc="Administering oral/IV metoprolol or 1L saline boluses to a patient in left ventricular cardiogenic shock with pulmonary oedema.",
-        trap_cond="Candidate orders beta-blockers or large fluid boluses.",
-        trap_rem="Never give beta-blockers in acute decompensated heart failure or cardiogenic shock (COMMIT trial), and avoid fluid overload in LV pump failure."
+        pert_rationale="Multifactorial fall syndrome driven by drug-induced orthostatic hypotension (drop >20/10 mmHg caused by concurrent vasodilator Amlodipine + diuretic Hydrochlorothiazide + alpha-blocking tricyclic Amitriptyline + sedative Zolpidem), sensory impairment, and environmental home hazards. Managed by de-prescribing high-risk medications (STOPP criteria), hydration/counter-manoeuvres, home hazard modification, and secondary fracture prevention.",
+        primary_dx="Multifactorial Falls Secondary to Drug-Induced Orthostatic Hypotension & Polypharmacy",
+        primary_sup=["Sustained postural BP drop 38/20 mmHg upon standing (<3 mins)", "Polypharmacy with 4 contributing offending drugs (Amlodipine, HCTZ, Amitriptyline, Zolpidem)", "TUG test 22s indicating impaired mobility/balance + home hazards (loose rugs, no grab bars)"],
+        mnm_dx="Cardiogenic Syncope (Arrhythmia / Aortic Stenosis)",
+        mnm_sup=["Collapse in an 82yo with cardiovascular risk factors"],
+        mnm_ref=["Normal 12-lead ECG without conduction blocks, no exertional syncope or cardiac murmurs, clear positional trigger upon standing"],
+        sec_dx="Normal Pressure Hydrocephalus / Subdural Haematoma",
+        sec_sup=["Unsteadiness and falls in an elderly patient"],
+        viva1_q="Define Orthostatic Hypotension and identify the offending medications contributing to her fall risk.",
+        viva1_rubric="Orthostatic Hypotension: sustained reduction in SBP >=20 mmHg or DBP >=10 mmHg within 3 minutes of standing. Offending drugs: Hydrochlorothiazide (volume depletion), Amlodipine (vasodilation), Amitriptyline (alpha-1 adrenergic blockade + anticholinergic sedation), Zolpidem (GABA-A hypnotic psychotropic causing ataxia and morning drowsiness).",
+        viva1_keys=["Orthostatic Hypotension definition: drop >=20 mmHg systolic or >=10 mmHg diastolic within 3 mins", "Hydrochlorothiazide (hypovolaemia)", "Amlodipine (vasodilation)", "Amitriptyline (alpha-blockade & sedation)", "Zolpidem (hypnotic ataxia/hangover)"],
+        viva2_q="Formulate a comprehensive multifactorial fall prevention intervention for Mdm. Tan.",
+        viva2_rubric="1. Medication rationalization (STOPP/START criteria: taper/stop Zolpidem and Amitriptyline, stop or reduce Hydrochlorothiazide/Amlodipine); 2. Non-pharmacological orthostatic management (hydration >1.5-2L, rise slowly, dorsiflex ankles before standing, waist-high compression stockings); 3. Home hazard modification (remove loose rugs, install bathroom grab bars, night lights); 4. Physiotherapy for balance/gait training (Tai Chi, prescribed walking frame); 5. Bone health (DEXA scan, Calcium 1000mg + Vitamin D3 1000-2000 IU, anti-resorptive therapy).",
+        viva2_keys=["Medication rationalization / STOPP criteria (taper sedatives & anticholinergics)", "Non-pharmacological measures (hydration, slow postural change, counter-manoeuvres)", "Environmental home hazard reduction (grab bars, remove rugs, lighting)", "Physiotherapy balance training and mobility aid", "Bone protection (Calcium, Vitamin D, DEXA assessment)"],
+        viva3_q="What screening tool is used to assess mobility and fall risk at the bedside, and what cut-off indicates high risk?",
+        viva3_rubric="The Timed Up and Go (TUG) test. The patient rises from an armchair, walks 3 metres, turns around, walks back, and sits down. A time >=12-14 seconds indicates high risk of future falls (her score was 22 seconds).",
+        viva3_keys=["Timed Up and Go (TUG) test", "Cut-off >=12-14 seconds indicates high risk", "Observe sit-to-stand, gait speed, turning, and sitting stability"],
+        trap_name="Treating Falls Purely as a Mechanical Event Without Checking Lying and Standing Blood Pressure",
+        trap_desc="Attributing falls solely to trips or old age without checking postural vitals or reviewing polypharmacy.",
+        trap_cond="Candidate omits lying/standing blood pressure measurement or fails to review the medication list.",
+        trap_rem="Always measure lying and standing BP (at 1 and 3 minutes) and review psychotropic/antihypertensive medications in every elderly patient who falls.",
+        extra_gates=[
+            InformationGate(
+                key="functional_adl_environment",
+                category=GateCategory.SOCIAL_HISTORY,
+                trigger_concepts=["rug", "mat", "carpet", "lighting", "bathroom", "grab bar", "stairs", "adl", "groceries", "cook", "bath"],
+                response_text="I live in a 3-room flat with loose floor mats in the corridor. There are no grab bars in the shower, and the hallway light is dim at night.",
+                mandatory_for_safety=False,
+            ),
+            InformationGate(
+                key="cognitive_screen_amt",
+                category=GateCategory.SYSTEMIC,
+                trigger_concepts=["memory", "forget", "amt", "mmse", "dementia", "confused", "orientation"],
+                response_text="I know my name, my age, that today is Tuesday, and that we are at TTSH. My daughter says I am slightly slower to remember names, but I manage my own money.",
+                mandatory_for_safety=False,
+            )
+        ]
     ),
 
     # 28. Acute Pericarditis (Cardiology)
@@ -903,14 +992,14 @@ HUNDRED_CASES_LIST: List[OSCECase] = [
         specialty="Cardiology",
         title="Sharp Positional Pleuritic Chest Pain Relieved by Sitting Forward After Viral Prodrome",
         setting="Emergency Department Ambulatory Bay",
-        patient_name="Mr. Lucas Tan",
-        age=29,
-        gender="Male",
+        patient_name="Ms. Chloe Tan",
+        age=26,
+        gender="Female",
         occupation="Software Engineer",
         complaint="12 hours of sharp central chest pain radiating to both trapezius ridges, worse on lying flat and deep inspiration",
         vitals={"Heart Rate": "96 bpm", "Blood Pressure": "124/78 mmHg", "Respiratory Rate": "18 /min", "Oxygen Saturation": "99% on room air", "Temperature": "37.8°C", "Heart Sounds": "Scratchy triphasic pericardial friction rub at left sternal edge"},
-        voice_id="en-SG-WayneNeural",
-        cues=["Sitting hunched forward over the bedside table", "Wincing whenever he tries to lie back or take a deep breath"],
+        voice_id="en-SG-LunaNeural",
+        cues=["Sitting hunched forward over the bedside table", "Wincing whenever she tries to lie back or take a deep breath"],
         socrates_trig=["pain", "sharp", "chest", "radiation", "shoulder", "trapezius"],
         socrates_resp="It's a sharp, stabbing pain right behind my breastbone that shoots up to the ridges of my shoulders. It started this morning.",
         rf1_key="red_flag_positional_pleuritic",
@@ -1191,63 +1280,82 @@ HUNDRED_CASES_LIST: List[OSCECase] = [
         trap_rem="Always calculate CHA2DS2-VASc and start a DOAC in non-valvular AF (>=2 in men, >=3 in women)."
     ),
 
-    # 33. Hypertensive Emergency (Cardiology / Renal / Neuro)
+    # 33. Acute Delirium & Precipitant Search (Geriatric Medicine)
     make_station(
         case_id="case_33",
-        specialty="Cardiology / Acute Medicine",
-        title="Hypertensive Encephalopathy with Grade IV Retinopathy & Microangiopathic Haemolysis",
-        setting="Tan Tock Seng Hospital (TTSH) ED Resus Bay",
-        patient_name="Mr. Steven Chua",
-        age=51,
+        specialty="Geriatric Medicine",
+        title="Acute Hyperactive Delirium Precipitated by Urosepsis & Constipation in an 84yo Man",
+        setting="Changi General Hospital (CGH) Acute Geriatric Ward",
+        patient_name="Mr. Seah Kian Seng",
+        age=84,
         gender="Male",
-        occupation="Freight Logistics Manager",
-        complaint="Severe throbbing occipital headache, blurred vision, vomiting, and mild confusion over the past 6 hours",
-        vitals={"Heart Rate": "98 bpm", "Blood Pressure": "236/142 mmHg (Equal in both arms)", "Respiratory Rate": "20 /min", "Oxygen Saturation": "98% on room air", "Temperature": "36.8°C", "GCS": "14/15"},
+        occupation="Retiree",
+        complaint="2 days of sudden fluctuating confusion, agitation, seeing strangers on the ceiling, and pulling out his drip",
+        vitals={
+            "Heart Rate": "108 bpm",
+            "Blood Pressure": "136/78 mmHg",
+            "Respiratory Rate": "22 /min",
+            "Oxygen Saturation": "96% on room air",
+            "Temperature": "38.3°C",
+            "4AT Score": "8/12 (Consistent with Delirium)"
+        },
         voice_id="en-SG-WayneNeural",
-        cues=["Rubbing back of head, squinting at lights", "Fundoscopy shows bilateral optic disc swelling (papilloedema), flame-shaped haemorrhages, and cotton-wool spots"],
-        socrates_trig=["headache", "vision", "blur", "vomit", "bp"],
-        socrates_resp="My head has been pounding at the back since this morning, my vision is blurry in both eyes, and I vomited twice.",
-        rf1_key="red_flag_end_organ_damage",
-        rf1_trig=["chest pain", "tearing", "back pain", "weakness", "slurred speech", "urine", "breathless"],
-        rf1_resp="No chest or back pain, and I can move my arms and legs equally, though my urine looked slightly smoky today.",
-        rf2_key="red_flag_med_withdrawal",
-        rf2_trig=["medications", "stopped", "clonidine", "nifedipine", "amlodipine", "tcm"],
-        rf2_resp="I ran out of my three blood pressure tablets (Amlodipine, Valsartan, Bisoprolol) two weeks ago when I was travelling.",
-        pmhx_trig=["hypertension", "kidney", "diabetes"],
-        pmhx_resp="Resistant hypertension for 10 years. NKDA.",
-        social_trig=["smoke", "cocaine", "alcohol"],
-        social_resp="Smokes 10/day, no illicit drugs.",
-        ice_resp="Is my brain bleeding from this 236 blood pressure, doctor?",
-        pert_title="Non-Contrast CT Brain, Fundoscopy & Renal/Haemolysis Panel",
-        pert_desc="Urgent CT Brain and bloods return:",
+        cues=["Restless, plucking at bedsheets and hospital gown", "Flushed, disorientated to time and place, fluctuating between drowsy and agitated"],
+        socrates_trig=["confusion", "agitation", "hallucination", "baseline", "onset", "fluctuating", "memory"],
+        socrates_resp="(Daughter): Two days ago Dad suddenly became confused. In the morning he was drowsy and wouldn't eat, but by evening he was shouting, seeing people crawling on the ceiling, and trying to climb out of bed!",
+        rf1_key="rf_cam_fluctuating_confusion",
+        rf1_trig=["fluctuate", "sundown", "attention", "acute", "cam", "4at", "hallucinating", "drowsy"],
+        rf1_resp="(Daughter): His confusion came on overnight and changes throughout the day. At lunch he recognized me, but by evening he didn't know where he was and couldn't keep his attention for ten seconds.",
+        rf2_key="rf_precipitant_urosepsis_constipation",
+        rf2_trig=["urine", "smell", "cloudy", "foul", "catheter", "constipation", "bowel", "stool", "tummy", "abdomen", "dysuria", "belly"],
+        rf2_resp="(Nurse): His urine is cloudy and foul-smelling. He has not passed motion for 5 days, and on palpation his lower abdomen is dull and distended with a palpable bladder.",
+        pmhx_trig=["dementia", "stroke", "bph", "hypertension", "diabetes"],
+        pmhx_resp="Mild Alzheimer's disease (baseline AMTS 7/10, manages self-care with reminders), BPH, and hypertension. NKDA.",
+        social_trig=["home", "daughter", "carer", "sleep"],
+        social_resp="Lives with daughter and domestic helper. Mobilises with a walking stick. Reversal of sleep-wake cycle over past 2 nights.",
+        ice_resp="(Daughter): Doctor, has his dementia suddenly worsened to the end stage, or can he return to normal?",
+        pert_title="Urinalysis, Bladder Scan, PR Exam & Sepsis Workup",
+        pert_desc="Bedside investigations and septic screen return:",
         pert_findings={
-            "CT Brain": "No intracranial haemorrhage or territorial infarct; subtle bilateral parieto-occipital subcortical white matter vasogenic oedema (PRES — Posterior Reversible Encephalopathy Syndrome).",
-            "Fundoscopy": "Keith-Wagener-Barker Grade IV Malignant Hypertensive Retinopathy (bilateral papilloedema + flame haemorrhages).",
-            "Bloods": "Creatinine 248 umol/L (Up from 105), Platelets 88 x 10^9/L, LDH 740 U/L, schistocytes on blood film (Thrombotic Microangiopathy)."
+            "Urinalysis": "Leukocyte esterase 3+, Nitrites positive, Blood 1+, Microscopy: >100 WBCs/hpf, Gram-negative bacilli.",
+            "Bedside Ultrasound / Bladder Scan": "Post-void urinary retention 620 mL. PR Exam: Large hard faecal impaction in rectum.",
+            "Bloods & CXR": "WBC 16.4 x 10^9/L (88% neutrophils), CRP 94 mg/L, Lactate 1.8 mmol/L, Creatinine 142 umol/L (baseline 90). CXR: Clear lung fields."
         },
         pert_shifts={
-            "Hypertensive Emergency (Hypertensive Encephalopathy / PRES + Malignant Nephrosclerosis)": 2,
-            "Hypertensive Urgency (Severe Asymptomatic Hypertension)": -2,
-            "Intracerebral Haemorrhage": -2
+            "Acute Hyperactive Delirium Secondary to Catheter-Associated Urosepsis & Faecal Impaction": 2,
+            "Acute Intracranial Event (Subdural / Stroke)": -2,
+            "Rapidly Progressive Neurodegenerative Dementia": -2
         },
-        pert_rationale="BP >180/120 mmHg WITH acute target-organ damage (Encephalopathy/PRES, Grade IV papilloedema, acute kidney injury, and microangiopathic haemolytic anaemia) defines a true Hypertensive Emergency. Crucial safety rule: Lower MAP by NO MORE than 20–25% in the first hour using a titratable IV infusion (IV Labetalol or IV Nicardipine)—dropping BP too rapidly to 'normal' causes watershed cerebral, retinal, and renal infarction!",
-        primary_dx="Hypertensive Emergency (Hypertensive Encephalopathy / PRES & Malignant Hypertension)",
-        primary_sup=["BP 236/142 mmHg after stopping 3 antihypertensives", "Target-organ damage: Encephalopathy/PRES on CT, Grade IV retinopathy (papilloedema), AKI (Cr 248), MAHA (schistocytes)", "CT Brain excludes intracerebral haemorrhage"],
-        mnm_dx="Intracerebral / Subarachnoid Haemorrhage",
-        mnm_sup=["Headache, vomiting, confusion, BP 236/142"],
-        mnm_ref=["Excluded by urgent non-contrast CT Brain showing PRES rather than haemorrhage"],
-        sec_dx="Thrombotic Thrombocytopenic Purpura (TTP)",
-        sec_sup=["MAHA (schistocytes + thrombocytopenia) + renal + neuro findings"],
-        viva1_q="Distinguish 'Hypertensive Emergency' from 'Hypertensive Urgency' and list the acute target-organ manifestations present in this patient.",
-        viva1_rubric="Hypertensive Emergency = severe BP elevation (>180/120 mmHg) WITH acute life-threatening target-organ damage (requires ICU admission and titratable IV antihypertensives). Hypertensive Urgency = severe BP elevation WITHOUT acute target-organ damage (treated with oral antihypertensives over 24-48h). This patient has 4 target-organ manifestations: 1) Hypertensive Encephalopathy / PRES, 2) Grade IV Retinopathy (papilloedema), 3) Acute Hypertensive Nephrosclerosis (AKI), 4) Microangiopathic Haemolytic Anaemia (MAHA).",
-        viva1_keys=["Emergency = BP >180/120 WITH acute target-organ damage vs Urgency = WITHOUT target-organ damage", "Target organs affected here: Brain (Encephalopathy/PRES), Eyes (Grade IV papilloedema), Kidneys (AKI), Blood vessels (MAHA/schistocytes)"],
-        viva2_q="What is the exact blood pressure reduction target in the first hour, which IV agent will you use, and why is sublingual Nifedipine contraindicated?",
-        viva2_rubric="Target: Reduce Mean Arterial Pressure (MAP) by NO MORE than 20–25% within the first hour, then gradually to ~160/100–110 mmHg over the next 2–6 hours, and normal over 24–48h (exception: Aortic Dissection where SBP <120 is targeted immediately). Agent: Titratable IV Labetalol or IV Nicardipine infusion with arterial line monitoring. Sublingual Nifedipine (or rapid reduction to 120/80) is strictly contraindicated because chronic hypertension shifts the cerebral autoregulatory curve to the right—precipitous BP drops below the lower autoregulatory limit cause catastrophic watershed cerebral ischaemia/stroke, optic nerve infarction (blindness), and myocardial infarction!",
-        viva2_keys=["Reduce MAP by maximum 20-25% in the first hour (then 160/100 over 2-6h)", "Titratable IV Labetalol or IV Nicardipine with arterial line", "Right-shifted cerebral autoregulation curve: rapid normalization causes watershed stroke/blindness/MI", "Sublingual Nifedipine is contraindicated (uncontrolled precipitous hypotension)"],
-        trap_name="Dropping Blood Pressure Rapidly to 120/80 mmHg or Giving Sublingual Nifedipine",
-        trap_desc="Attempting to normalize BP from 236/142 to 120/80 within an hour.",
-        trap_cond="Candidate fails to limit first-hour MAP reduction to 20-25%.",
-        trap_rem="In Hypertensive Encephalopathy, the cerebral autoregulation curve is shifted right. Reduce MAP by max 20-25% in hour 1 using IV Labetalol/Nicardipine."
+        pert_rationale="Acute delirium diagnosed via CAM (acute onset, fluctuating course, inattention, altered consciousness) triggered by multifactorial organic precipitants: urinary tract infection / urosepsis, urinary retention, and faecal impaction on a vulnerable background of mild neurocognitive disorder. Management requires treating precipitants (IV antibiotics, relieve retention and impaction), environmental reorientation, and avoiding physical restraints or routine sedatives.",
+        primary_dx="Acute Hyperactive Delirium Secondary to UTI / Urosepsis & Faecal Impaction",
+        primary_sup=["CAM positive: acute onset, fluctuating alertness, marked inattention, visual hallucinations", "Clear organic precipitants: pyuria/nitrites positive with WBC 16.4, urinary retention (620 mL), hard rectal faecal impaction", "Reversibility with precipitant treatment expected unlike underlying chronic dementia"],
+        mnm_dx="Intracranial Infection / Subdural Haematoma",
+        mnm_sup=["Fever, confusion, fluctuating GCS in an elderly patient"],
+        mnm_ref=["Symmetrical neurological examination, no meningism, no focal deficits or cranial nerve signs"],
+        sec_dx="Progression of Underlying Dementia / Lewy Body Dementia",
+        sec_sup=["Pre-existing mild cognitive impairment with new hallucinations"],
+        viva1_q="State the Confusion Assessment Method (CAM) diagnostic criteria for delirium.",
+        viva1_rubric="Diagnosis of delirium by CAM requires: 1. Acute onset and fluctuating course AND 2. Inattention; PLUS either 3. Disorganized thinking OR 4. Altered level of consciousness (hyperactive, hypoactive, or mixed).",
+        viva1_keys=["Feature 1: Acute onset and fluctuating course (mandatory)", "Feature 2: Inattention (mandatory)", "Feature 3: Disorganized thinking (either 3 or 4)", "Feature 4: Altered level of consciousness (either 3 or 4)"],
+        viva2_q="Outline the 'PINCH ME' approach to identifying reversible causes of delirium.",
+        viva2_rubric="PINCH ME: P - Pain; I - Infection (UTI, chest, skin); N - Nutrition / dehydration; C - Constipation / urinary retention; H - Hypoxia / metabolic (hypoglycaemia, hyponatraemia, hypercalcaemia); M - Medication (anticholinergics, sedatives, opiates, polypharmacy) / Metabolic; E - Environmental change / sensory impairment (hearing aids, glasses).",
+        viva2_keys=["PINCH ME mnemonic components", "Identify Infection (UTI pyuria) and Constipation/retention in this case", "Review polypharmacy and anticholinergic drug burden"],
+        viva3_q="How should hyperactive delirium be managed without physical restraints, and when is pharmacological sedation permissible?",
+        viva3_rubric="1. Non-pharmacological first-line: reorientation cues (clock, calendar, well-lit room), family presence, ensure glasses and hearing aids are on, avoid room changes, address pain, avoid physical restraints (which increase agitation and injury); 2. Pharmacological sedation is STRICTLY A LAST RESORT only if the patient poses an immediate danger to self or others: low-dose oral Haloperidol (0.5-1 mg) or Quetiapine (if Parkinson's/Lewy body), never benzodiazepines (which worsen delirium).",
+        viva3_keys=["Non-pharmacological reorientation first-line (lighting, family, glasses/hearing aids)", "Avoid physical restraints (worsen agitation and delirium)", "Sedation only if immediate harm/violence as last resort", "Low-dose Haloperidol 0.5-1mg (or Quetiapine if Lewy body/Parkinson's), avoid benzodiazepines"],
+        trap_name="Prescribing Benzodiazepines or Physical Restraints for Delirium Agitation",
+        trap_desc="Sedating a confused elderly patient with diazepam/lorazepam or applying physical restraints without treating the underlying infection and impaction.",
+        trap_cond="Candidate orders benzodiazepines or restraints instead of organic precipitant treatment.",
+        trap_rem="Benzodiazepines worsen delirium and increase fall/aspiration risk. Always treat the underlying PINCH ME precipitants first.",
+        extra_gates=[
+            InformationGate(
+                key="intracranial_insult_screen",
+                category=GateCategory.RED_FLAG,
+                trigger_concepts=["pupils", "stroke", "weakness", "facial", "neck", "trauma", "hit head", "stiff"],
+                response_text="(Nurse): Pupils are equal and briskly reactive, limb power is 4/5 symmetrically, no facial droop, no neck stiffness, and no head bruising from his recent trip.",
+                mandatory_for_safety=True,
+            )
+        ]
     ),
 
     # 34. Complete Heart Block / Stokes-Adams Syncope (Cardiology)
@@ -1256,16 +1364,16 @@ HUNDRED_CASES_LIST: List[OSCECase] = [
         specialty="Cardiology / Emergency Medicine",
         title="Sudden Unprovoked Syncope (Stokes-Adams Attack) with Complete Heart Block",
         setting="National University Hospital (NUH) ED Monitored Bay",
-        patient_name="Mr. Lim Choon Huat",
-        age=77,
-        gender="Male",
-        occupation="Retired Postman",
+        patient_name="Mdm. Lim Choon Lan",
+        age=78,
+        gender="Female",
+        occupation="Retired Seamstress",
         complaint="Collapsed suddenly without warning while standing in the kitchen this morning, waking up on the floor 20 seconds later",
         vitals={"Heart Rate": "32 bpm (Regular bradycardia!)", "Blood Pressure": "92/54 mmHg", "Respiratory Rate": "18 /min", "Oxygen Saturation": "97% on room air", "Temperature": "36.5°C", "JVP": "Intermittent giant 'cannon A waves' in the neck"},
-        voice_id="en-SG-WayneNeural",
+        voice_id="en-SG-LunaNeural",
         cues=["Pale, dizzy when sitting up, small cut on forehead from fall", "Variable intensity S1 and intermittent cannon A waves on JVP"],
         socrates_trig=["faint", "collapse", "fall", "warning", "blackout", "syncope"],
-        socrates_resp="I was just standing making coffee when the lights went out instantly—zero dizziness or warning beforehand! Seconds later I woke up on the kitchen tiles with my wife shouting my name.",
+        socrates_resp="I was just standing making coffee when the lights went out instantly—zero dizziness or warning beforehand! Seconds later I woke up on the kitchen tiles with my daughter shouting my name.",
         rf1_key="red_flag_cardiogenic_syncope_features",
         rf1_trig=["chest pain", "breathless", "palpitations", "seizure", "tongue bite", "confusion"],
         rf1_resp="My head was completely clear the moment I woke up—no confusion or tongue biting, though I feel very dizzy and breathless now.",
@@ -1275,7 +1383,7 @@ HUNDRED_CASES_LIST: List[OSCECase] = [
         pmhx_trig=["past", "heart", "diabetes", "kidney"],
         pmhx_resp="Hypertension and hyperlipidaemia. Had two brief dizzy spells last week. NKDA.",
         social_trig=["home", "independent", "smoke"],
-        social_resp="Lives with wife, previously independent.",
+        social_resp="Lives with daughter, previously independent.",
         ice_resp="Did I have a stroke or epilepsy, doctor?",
         pert_title="12-Lead ECG & Serum Electrolytes / Troponin",
         pert_desc="12-lead ECG and blood panel return:",
@@ -1325,7 +1433,7 @@ HUNDRED_CASES_LIST: List[OSCECase] = [
         socrates_trig=["faint", "collapse", "basketball", "sprint", "exercise", "exertion"],
         socrates_resp="I was sprinting down the court on a fast break when my chest felt tight and I blacked out right on the court! My teammates said I woke up after 15 seconds.",
         rf1_key="red_flag_family_sudden_death",
-        rf1_trig=["family", "sudden death", "uncle", "father", "brother", "young", "heart", "drowning"],
+        rf1_trig=["sudden death", "family history of sudden death", "died young", "cardiac death", "unexplained drowning", "relative died", "premature death"],
         rf1_resp="Yes, actually—my father's younger brother collapsed and died suddenly while jogging when he was just 28 years old!",
         rf2_key="red_flag_exertional_angina_palpitations",
         rf2_trig=["chest pain", "palpitations", "breathless", "previous", "dizzy"],

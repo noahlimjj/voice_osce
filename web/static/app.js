@@ -327,6 +327,7 @@ let latestMarkdownReport = "";
 
 let clientSession = {
   unlockedGateKeys: new Set(),
+  assistedGateKeys: new Set(), // unlocked by a macro or click, not a typed question
   turnCount: 0,
   perturbationTriggered: false,
   perturbationVoted: false,
@@ -478,6 +479,8 @@ function renderSymptomApproachDrawer(clusterKey) {
 function inferSymptomCluster(c) {
   if (c.symptom_cluster) {
     const sc = String(c.symptom_cluster).toLowerCase().replace(/[^a-z0-9]+/g, "_");
+    if (sc.includes("geriatric") || sc.includes("elderly") || sc.includes("fall")) return "geriatrics";
+    if (sc.includes("communicat") || sc.includes("ethic") || sc.includes("spikes")) return "communication";
     if (sc.includes("chest")) return "chest_pain";
     if (sc.includes("abdom") || sc.includes("gi") || sc.includes("gastro")) return "abdominal_pain";
     if (sc.includes("fever") || sc.includes("infect") || sc.includes("sepsis") || sc.includes("tropical")) return "fever";
@@ -491,6 +494,8 @@ function inferSymptomCluster(c) {
   }
 
   const text = `${c.id || c.case_id || ""} ${c.specialty || ""} ${c.brief?.presenting_complaint || c.chief_complaint || ""} ${c.title || ""}`.toLowerCase();
+  if (text.includes("geriatric") || text.includes("falls") || text.includes("polypharmacy") || text.includes("orthostatic")) return "geriatrics";
+  if (text.includes("communication") || text.includes("bad news") || text.includes("spikes protocol") || text.includes("ethics")) return "communication";
   if (text.includes("obgyn") || text.includes("obstetric") || text.includes("gynecol") || text.includes("pregnant") || text.includes("ectopic") || text.includes("preeclampsia") || text.includes("postpartum")) return "obgyn";
   if (text.includes("peds") || text.includes("pediatric") || text.includes("paediatric") || text.includes("infant") || text.includes("kawasaki") || text.includes("intussusception") || text.includes("bronchiolitis") || text.includes("croup")) return "pediatrics";
   if (text.includes("psych") || text.includes("suicid") || text.includes("mania") || text.includes("delirium") || text.includes("serotonin") || text.includes("neuroleptic") || text.includes("depression")) return "psych";
@@ -515,7 +520,9 @@ function getClusterLabel(clusterKey) {
     obgyn: "OBGYN",
     pediatrics: "Pediatrics",
     psych: "Psychiatry",
-    ent_eye: "ENT & Eye"
+    ent_eye: "ENT & Eye",
+    geriatrics: "Geriatrics",
+    communication: "Communication"
   };
   return labels[clusterKey] || "Clinical";
 }
@@ -890,6 +897,7 @@ async function startConsultationSession() {
 
   clientSession = {
     unlockedGateKeys: new Set(),
+    assistedGateKeys: new Set(), // unlocked by a macro or click, not a typed question
     turnCount: 0,
     perturbationTriggered: false,
     perturbationVoted: false,
@@ -1036,25 +1044,29 @@ const GENERAL_NEGATIVE_EXCLUSIONS = {
   "rash": "No other generalized rash"
 };
 
-function evaluateBlitzQueryClientSide(queryText, forcedCategories = null) {
+function evaluateBlitzQueryClientSide(queryText, forcedCategories = null, assisted = false) {
   if (!activeCase) return null;
   const textLower = queryText.toLowerCase();
   const newlyUnlocked = [];
   const previouslyUnlocked = [];
 
   (activeCase.gates || []).forEach(gate => {
-    const matchesCategoryMacro = forcedCategories && forcedCategories.includes(gate.category);
-    const matchesSafetyMacro = forcedCategories && forcedCategories.includes("safety_mandatory") && gate.mandatory_for_safety;
+    const isRedFlag = (gate.mandatory_for_safety || gate.category === "red_flag") && gate.category !== "past_history";
+    // Macros can NEVER force-unlock safety red flags!
+    const matchesCategoryMacro = forcedCategories && forcedCategories.includes(gate.category) && !isRedFlag;
     const triggers = gate.trigger_concepts || gate.triggers || [];
     const matchesConcept = triggers.some(c => conceptMatchesText(c, textLower)) ||
-      textLower.includes(gate.key.replace(/_/g, " ").toLowerCase());
+      (!isRedFlag && textLower.includes(gate.key.replace(/_/g, " ").toLowerCase()));
 
-    if (matchesCategoryMacro || matchesSafetyMacro || matchesConcept) {
+    if (matchesCategoryMacro || matchesConcept) {
+      const prompted = assisted || (!!forcedCategories && !matchesConcept);
       if (!clientSession.unlockedGateKeys.has(gate.key)) {
         gate.unlocked = true;
         clientSession.unlockedGateKeys.add(gate.key);
+        if (prompted) clientSession.assistedGateKeys.add(gate.key);
         newlyUnlocked.push(gate);
       } else {
+        if (!prompted && matchesConcept) clientSession.assistedGateKeys.delete(gate.key);
         previouslyUnlocked.push(gate);
       }
     }
@@ -1103,12 +1115,8 @@ function fireSpamMacro(macroType) {
     forcedCategories = ["socrates"];
   } else if (macroType === "red_flags") {
     macroTitle = "🚨 Red Flags";
-    const caseRedFlagTerms = (activeCase.gates || [])
-      .filter(g => g.category === "red_flag" || g.mandatory_for_safety)
-      .map(g => (g.trigger_concepts || g.triggers || [])[0] || g.key.replace(/_/g, " "))
-      .join(" ");
-    macroQuery = `${caseRedFlagTerms} fever weight loss night sweats neuro deficits syncope bleeding`.trim();
-    forcedCategories = ["red_flag", "safety_mandatory"];
+    macroQuery = "fever weight loss night sweats neuro deficits syncope bleeding shortness of breath chest pain vomiting blood altered mental state";
+    forcedCategories = [];
   } else if (macroType === "pmhx_meds") {
     macroTitle = "💊 PMHx & Meds";
     macroQuery = "past medical history diabetes hypertension surgery medications blood thinners allergies compliance";
@@ -1123,11 +1131,11 @@ function fireSpamMacro(macroType) {
     forcedCategories = ["systemic"];
   } else if (macroType === "all_clinical") {
     macroTitle = "Sweep All";
-    macroQuery = "site onset character radiation severity red flags past medical history medications allergies social travel physical examination vitals";
-    forcedCategories = ["socrates", "red_flag", "safety_mandatory", "past_history", "drug_history", "social", "systemic"];
+    macroQuery = "site onset character radiation severity past medical history medications allergies social travel physical examination vitals";
+    forcedCategories = ["socrates", "past_history", "drug_history", "social", "systemic"];
   }
 
-  executeBlitzTurn(macroQuery, forcedCategories, macroTitle);
+  executeBlitzTurn(macroQuery, forcedCategories, macroTitle, true);
 }
 
 function unlockSingleGateByClick(gateKey) {
@@ -1135,7 +1143,7 @@ function unlockSingleGateByClick(gateKey) {
   const gate = (activeCase.gates || []).find(g => g.key === gateKey);
   if (!gate) return;
   const triggerWord = (gate.trigger_concepts || gate.triggers || [])[0] || gate.key.replace(/_/g, " ");
-  executeBlitzTurn(triggerWord, null, formatGateTitle(gate.key));
+  executeBlitzTurn(triggerWord, null, formatGateTitle(gate.key), true);
 }
 
 function sendCandidateMessage() {
@@ -1146,8 +1154,8 @@ function sendCandidateMessage() {
   executeBlitzTurn(text, null, null);
 }
 
-function executeBlitzTurn(queryText, forcedCategories = null, macroBadge = null) {
-  const result = evaluateBlitzQueryClientSide(queryText, forcedCategories);
+function executeBlitzTurn(queryText, forcedCategories = null, macroBadge = null, assisted = false) {
+  const result = evaluateBlitzQueryClientSide(queryText, forcedCategories, assisted);
   if (!result) return;
 
   appendMinimalistFindingCard(result, queryText, macroBadge);
@@ -1178,6 +1186,10 @@ const GATE_TITLE_TERMS = {
 };
 
 function formatGateTitle(key) {
+  const explicitOverrides = {
+    rf_deep_peroneal_pulse: "Deep Peroneal Sensation & Pedal Pulses",
+  };
+  if (explicitOverrides[key]) return explicitOverrides[key];
   // "rf_co2_narcosis" -> "CO₂ narcosis"; "pmhx_drugs_allergies" -> "PMHx, drugs & allergies"
   const words = String(key || "").toLowerCase().split(/_+/).filter(Boolean);
   if (words[0] === "rf" || (words[0] === "red" && words[1] === "flag")) {
@@ -1216,6 +1228,7 @@ function appendMinimalistFindingCard(result, queryText, macroBadge) {
           <span class="font-medium text-zinc-300">${escapeHtml(formatGateTitle(g.key))}:</span>
           ${rfTag}
           <span class="ml-1 text-zinc-100">${escapeHtml(resp)}</span>
+          ${g.examiner_note ? `<div class="mt-1 text-[11px] text-zinc-500"><span class="font-mono uppercase tracking-wide">Exam:</span> ${escapeHtml(g.examiner_note)}</div>` : ""}
         </div>
       </div>
     `;
@@ -1666,8 +1679,12 @@ function renderFinalScorecard(dxText, planText) {
   const redFlagGates = gates.filter(g => g.mandatory_for_safety || g.category === "red_flag");
   const clinicalTriggerGates = gates.filter(g => g.category !== "ice" && !g.mandatory_for_safety && g.category !== "red_flag");
 
+  const assistedKeys = clientSession.assistedGateKeys || new Set();
   const rfUnlocked = redFlagGates.filter(g => clientSession.unlockedGateKeys.has(g.key)).length;
-  const rfRatio = redFlagGates.length > 0 ? rfUnlocked / redFlagGates.length : 1.0;
+  const rfAssisted = redFlagGates.filter(g => clientSession.unlockedGateKeys.has(g.key) && assistedKeys.has(g.key)).length;
+  // Red flags you asked about yourself score in full; ones revealed by a macro or click award 0 pts
+  const rfIndependent = redFlagGates.filter(g => clientSession.unlockedGateKeys.has(g.key) && !assistedKeys.has(g.key)).length;
+  const rfRatio = redFlagGates.length > 0 ? rfIndependent / redFlagGates.length : 1.0;
   const rfScore = Math.round(rfRatio * 40 * 10) / 10;
 
   const ctUnlocked = clinicalTriggerGates.filter(g => clientSession.unlockedGateKeys.has(g.key)).length;
@@ -1685,7 +1702,7 @@ function renderFinalScorecard(dxText, planText) {
   const vivaScore = Math.round(vivaRatio * 15 * 10) / 10;
 
   const totalScore = Math.round(rfScore + ctScore + pivotScore + vivaScore);
-  const safetyPass = redFlagGates.filter(g => g.mandatory_for_safety && !clientSession.unlockedGateKeys.has(g.key)).length === 0;
+  const safetyPass = redFlagGates.filter(g => g.mandatory_for_safety && (!clientSession.unlockedGateKeys.has(g.key) || assistedKeys.has(g.key))).length === 0;
 
   let grade = "Clear Pass";
   if (!safetyPass) grade = "Safety Alert";
@@ -1737,7 +1754,7 @@ function renderFinalScorecard(dxText, planText) {
   const metricsGrid = document.getElementById("card-metrics-grid");
   if (metricsGrid) {
     const metrics = [
-      { label: "Red Flags (40%)", val: `${rfScore}/40`, sub: `${rfUnlocked}/${redFlagGates.length} cleared`, ratio: rfScore / 40 },
+      { label: "Red Flags (40%)", val: `${rfScore}/40`, sub: rfAssisted ? `${rfIndependent}/${redFlagGates.length} · ${rfAssisted} assisted` : `${rfIndependent}/${redFlagGates.length} cleared`, ratio: rfScore / 40 },
       { label: "History (20%)", val: `${ctScore}/20`, sub: `${ctUnlocked}/${clinicalTriggerGates.length} clues`, ratio: ctScore / 20 },
       { label: "Dx & Twist (25%)", val: `${pivotScore}/25`, sub: `${Math.round((pivotScore / 25) * 100)}% align`, ratio: pivotScore / 25 },
       { label: "Management (15%)", val: `${vivaScore}/15`, sub: `${Math.round(vivaRatio * 100)}% key pts`, ratio: vivaScore / 15 }
@@ -1760,12 +1777,18 @@ function renderFinalScorecard(dxText, planText) {
   if (rfListEl) {
     rfListEl.innerHTML = redFlagGates.map(g => {
       const cleared = clientSession.unlockedGateKeys.has(g.key);
-      const resp = g.response_text || g.response || "";
+      const prompted = cleared && assistedKeys.has(g.key);
+      const resp = g.examiner_note || g.response_text || g.response || "";
+      const statusBadge = (cleared && !prompted)
+        ? '<span class="text-[10px] font-mono text-emerald-400">✓ Cleared</span>'
+        : prompted
+        ? '<span class="text-[10px] font-mono text-zinc-500">[Revealed by assist — 0 pts]</span>'
+        : '<span class="text-[10px] font-mono text-rose-400">Missed</span>';
       return `
         <div class="bg-[#090A10] hairline-border rounded-lg p-2.5 flex items-start gap-2">
-          <span class="font-mono font-bold ${cleared ? 'text-emerald-400' : 'text-amber-400'} mt-0.5">${cleared ? '✓' : '!'}</span>
+          <span class="font-mono font-bold ${cleared && !prompted ? 'text-emerald-400' : cleared ? 'text-amber-400' : 'text-rose-400'} mt-0.5">${cleared && !prompted ? '✓' : '!'}</span>
           <div class="space-y-0.5">
-            <div class="font-medium ${cleared ? 'text-zinc-200' : 'text-amber-300'}">${escapeHtml(formatGateTitle(g.key))}</div>
+            <div class="font-medium ${cleared && !prompted ? 'text-zinc-200' : 'text-amber-300'}">${escapeHtml(formatGateTitle(g.key))} ${statusBadge}</div>
             <div class="text-[11px] text-zinc-400 leading-snug">${escapeHtml(resp)}</div>
           </div>
         </div>

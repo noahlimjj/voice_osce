@@ -36,6 +36,7 @@ class InformationGate:
     response_text: str            # What the patient says in character
     unlocked: bool = False
     mandatory_for_safety: bool = False # Failing to ask this fails the safety gate
+    examiner_note: str = ""       # Examiner-facing finding shown alongside the patient's lay answer
 
 
 @dataclass

@@ -51,7 +51,7 @@ CASE_ORTHOPEDICS_SEPTIC_KNEE = OSCECase(
         InformationGate(
             key="weight_bearing_onset",
             category=GateCategory.RED_FLAG,
-            trigger_concepts=["walk", "bear weight", "stand", "step", "put weight", "onset", "when did it start"],
+            trigger_concepts=["walk", "bear weight", "stand", "step", "put weight", "weight-bearing", "weightbearing", "able to stand", "able to walk"],
             response_text="It woke me up out of a dead sleep around 3 AM. A raging, throbbing heat inside my right knee. I tried to stand up to go to the bathroom and collapsed immediately—I cannot put even one ounce of weight on that leg without screaming.",
             mandatory_for_safety=True
         ),

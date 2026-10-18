@@ -53,6 +53,10 @@ CASE_REGISTRY: Dict[str, OSCECase] = {
 for _c in HUNDRED_CASES_LIST + CASES_36_TO_55 + build_remaining_cases():
     CASE_REGISTRY[_c.case_id] = _c
 
+from voice_osce.cases.discriminators import apply_overrides  # noqa: E402
+
+apply_overrides(CASE_REGISTRY)
+
 CASE_LIBRARY: Dict[str, OSCECase] = CASE_REGISTRY
 
 

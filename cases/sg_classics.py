@@ -64,7 +64,7 @@ CASE_SG_DENGUE = OSCECase(
         InformationGate(
             key="warning_abdominal_vomiting",
             category=GateCategory.RED_FLAG,
-            trigger_concepts=["abdominal", "pain", "stomach", "tummy", "vomit", "vomiting", "nausea", "keep fluids down", "drink"],
+            trigger_concepts=["abdominal pain", "tummy pain", "stomach pain", "vomit", "vomiting", "persistent vomiting", "nausea", "keep fluids down", "drink"],
             response_text="Since my fever dropped this morning, I've had severe, continuous epigastric and right upper tummy pain, and I've vomited 5 times—can't even keep a sip of 100Plus or water down.",
             mandatory_for_safety=True
         ),
@@ -371,7 +371,7 @@ CASE_SG_NPC = OSCECase(
         InformationGate(
             key="nasal_epistaxis_postnasal",
             category=GateCategory.RED_FLAG,
-            trigger_concepts=["nose", "bleed", "epistaxis", "phlegm", "spit", "blood", "blocked nose", "morning"],
+            trigger_concepts=["nosebleed", "epistaxis", "blood in phlegm", "postnasal", "spitting blood", "hawk phlegm", "blood in saliva", "blocked nose", "nasal obstruction"],
             response_text="Every morning when I hawk back phlegm from the back of my nose and spit into the basin, there are streaks of blood in it. My right nostril also feels blocked.",
             mandatory_for_safety=True
         ),
@@ -631,8 +631,8 @@ CASE_SG_MESENTERIC = OSCECase(
         InformationGate(
             key="pain_out_of_proportion",
             category=GateCategory.RED_FLAG,
-            trigger_concepts=["pain", "where", "onset", "severity", "examine", "palpate", "soft", "guarding", "tenderness"],
-            response_text="It started suddenly 4 hours ago—the worst agony of my life, 10 out of 10, right around my belly button. Strangely, when the triage doctor pressed hard on my stomach, it didn't make the pain much worse (soft, non-peritonitic abdomen: 'pain out of proportion to clinical findings'!).",
+            trigger_concepts=["out of proportion", "pain out of proportion", "palpate", "pressing", "soft abdomen", "guarding", "tenderness on palpation", "peritonism"],
+            response_text="It started suddenly 4 hours ago—the worst agony of my life, 10 out of 10, right around my belly button. But when the doctor pressed on my stomach, it didn't hurt much more—it felt totally soft to her touch, even though inside it feels like it's dying.",
             mandatory_for_safety=True
         ),
         InformationGate(
@@ -690,7 +690,7 @@ CASE_SG_MESENTERIC = OSCECase(
             name="Ruptured Abdominal Aortic Aneurysm (AAA) or Perforated Viscus",
             tier=DifferentialTier.MUST_NOT_MISS,
             supporting_features=["Sudden catastrophic abdominal pain in older vascular patient"],
-            refuting_features=["Excluded by CT Angiogram showing intact aorta and no pneumoperitoneum"],
+            refuting_features=["CT angiogram shows an intact aorta and no pneumoperitoneum", "Soft abdomen early: pain out of proportion to signs fits mesenteric ischaemia"],
             prior_probability=0.15,
             posterior_probability=0.01
         )

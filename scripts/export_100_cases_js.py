@@ -13,16 +13,22 @@ sys.path.insert(0, str(ROOT.parent))
 from voice_osce.cases import CASE_REGISTRY, SG_CLASSIC_IDS
 from voice_osce.cases.case_schema import GateCategory
 
+TIER_LABEL = {"primary": "Primary", "must_not_miss": "Must-Not-Miss", "secondary": "Secondary", "unlikely": "Unlikely"}
+
 
 def infer_symptom_cluster(case_id: str, specialty: str, complaint: str, title: str) -> str:
-    s = f"{specialty} {complaint} {title}".lower()
-    if "obgyn" in case_id or "obstetric" in s or "gynaec" in s or "ectopic" in s or "pregnancy" in s or "postmenopausal" in s:
+    s = f"{case_id} {specialty} {complaint} {title}".lower()
+    if "geriatric" in s or "falls" in s or "delirium" in s or "polypharmacy" in s:
+        return "Geriatrics"
+    if "communication" in s or "ethics" in s or "spikes" in s or "bad news" in s:
+        return "Communication"
+    if "obgyn" in case_id or "obstetric" in s or "gynaec" in s or "ectopic" in s or "pregnancy" in s or "postmenopausal" in s or "menstrual" in s or "fibroid" in s:
         return "OBGYN"
-    if "peds" in case_id or "paediatric" in s or "infant" in s or "toddler" in s or "kawasaki" in s or "croup" in s or "bronchiolitis" in s:
+    if "peds" in case_id or "paediatric" in s or "infant" in s or "toddler" in s or "kawasaki" in s or "croup" in s or "bronchiolitis" in s or "development" in s or "autism" in s:
         return "Pediatrics"
-    if "psych" in case_id or "psychiatry" in s or "toxicology" in s or "overdose" in s or "suicide" in s or "mania" in s or "delirium tremens" in s or "serotonin" in s:
+    if "psych" in case_id or "psychiatry" in s or "toxicology" in s or "overdose" in s or "suicide" in s or "mania" in s or "delirium tremens" in s or "serotonin" in s or "psychosis" in s or "schizophrenia" in s:
         return "Psych"
-    if "ent" in case_id or "ophthalm" in s or "glaucoma" in s or "retinal" in s or "nasopharyngeal" in s:
+    if "ent" in case_id or "vertigo" in s or "vestibular" in s or "hints" in s or "ophthalm" in s or "glaucoma" in s or "retinal" in s or "nasopharyngeal" in s:
         return "ENT & Eye"
     if "chest pain" in s or "retrosternal" in s or "stemi" in s or "pericarditis" in s or "dissection" in s or "boerhaave" in s:
         return "Chest Pain"
@@ -30,7 +36,7 @@ def infer_symptom_cluster(case_id: str, specialty: str, complaint: str, title: s
         return "Dyspnea"
     if "headache" in s or "stroke" in s or "seizure" in s or "weakness" in s or "neuro" in s or "paralysis" in s or "meningitis" in s or "palsy" in s or "hydrocephalus" in s or "apoplexy" in s or "arteritis" in s:
         return "Headache & Neuro"
-    if "knee" in s or "hip" in s or "wrist" in s or "shoulder" in s or "back" in s or "cauda" in s or "compartment" in s or "gout" in s or "ischemia" in s and "limb" in s or "spondyl" in s or "rheumatoid" in s:
+    if "knee" in s or "hip" in s or "wrist" in s or "shoulder" in s or "back" in s or "cauda" in s or "compartment" in s or "gout" in s or ("ischemia" in s and "limb" in s) or "spondyl" in s or "rheumatoid" in s:
         return "Limb & Joint"
     if "fever" in s or "rigors" in s or "dengue" in s or "melioidosis" in s or "typhus" in s or "leptospirosis" in s or "endocarditis" in s or "pneumonia" in s or "empyema" in s or "tb" in s or "stevens-johnson" in s or "heat" in s:
         return "Fever"
@@ -40,10 +46,25 @@ def infer_symptom_cluster(case_id: str, specialty: str, complaint: str, title: s
 
 
 def infer_difficulty_and_time(case_id: str, specialty: str, title: str):
-    t = f"{specialty} {title}".lower()
-    if any(k in t for k in ["shock", "dissection", "storm", "apoplexy", "boerhaave", "hellp", "abruption", "sjs", "mesenteric", "klebsiella", "status epilepticus", "sbp"]):
+    t = f"{case_id} {specialty} {title}".lower()
+    hard_kws = [
+        "shock", "dissection", "storm", "apoplexy", "boerhaave", "hellp", "abruption",
+        "sjs", "mesenteric", "klebsiella", "status epilepticus", "sbp", "tamponade",
+        "cauda equina", "phaeochromocytoma", "ruptured", "myasthenia", "perforated",
+        "diabetic", "hhs", "hyperkalemia", "compartment", "anaphylac", "strangulated",
+        "empyema", "pulmonary embolism", "heat", "tension pneumothorax",
+        "massive upper", "hyperacute severe headache", "purpura", "cord myelopathy"
+    ]
+    easy_kws = [
+        "scaphoid", "gout", "bell", "febrile", "croup", "urinary retention",
+        "pericarditis", "appendicitis", "cholecystitis", "intussusception", "pyloric",
+        "bronchiolitis", "overdose", "uveitis", "vertigo", "radiculopathy",
+        "hot swollen right knee", "postmenopausal", "pelvic inflammatory",
+        "quadriparesis", "synpharyngitic", "bactrim", "hydrocephalus", "shaking chills"
+    ]
+    if any(k in t for k in hard_kws):
         return "Hard", 120, "50s History Spam • 30s Bedside Twist • 40s Dx & Plan"
-    if any(k in t for k in ["appendicitis", "scaphoid", "gout", "bell's", "simple febrile", "croup", "shoulder", "urinary retention", "pericarditis"]):
+    if any(k in t for k in easy_kws):
         return "Easy", 60, "25s History Spam • 15s Bedside Twist • 20s Dx & Plan"
     return "Intermediate", 90, "40s History Spam • 25s Bedside Twist • 25s Dx & Plan"
 
@@ -70,6 +91,7 @@ def export_all():
                 "trigger_concepts": g.trigger_concepts,
                 "patient_response": g.response_text,
                 "response_text": g.response_text,
+                "examiner_note": g.examiner_note,
                 "clinical_significance": "Critical Red Flag / Safety Gate" if g.mandatory_for_safety else "Core Clinical History Clue",
                 "is_red_flag": bool(g.mandatory_for_safety or g.category == GateCategory.RED_FLAG),
                 "mandatory_for_safety": bool(g.mandatory_for_safety),
@@ -81,7 +103,8 @@ def export_all():
                     "name": g.key.replace("red_flag_", "").replace("rf_", "").replace("_", " ").title(),
                     "trigger_keywords": g.trigger_concepts,
                     "patient_response": g.response_text,
-                    "clinical_rationale": g.response_text,
+                    "examiner_note": g.examiner_note,
+                    "clinical_rationale": g.examiner_note or g.response_text,
                 })
 
         diffs_serialized = [
@@ -89,12 +112,12 @@ def export_all():
                 "diagnosis": d.name,
                 "name": d.name,
                 "tier": d.tier.value if hasattr(d.tier, "value") else str(d.tier),
-                "likelihood": "Primary" if idx_d == 0 else ("Must-Not-Miss" if idx_d == 1 else "Secondary"),
+                "likelihood": TIER_LABEL.get(d.tier.value if hasattr(d.tier, "value") else str(d.tier), "Secondary"),
                 "key_supporting_features": d.supporting_features,
                 "supporting_features": d.supporting_features,
                 "refuting_features": d.refuting_features,
             }
-            for idx_d, d in enumerate(case.differentials)
+            for d in case.differentials
         ]
 
         viva_serialized = [
@@ -110,8 +133,23 @@ def export_all():
             for v in case.viva_questions
         ]
 
+        has_pert = bool(case.perturbation and getattr(case.perturbation, "description", None))
+        rationale = (case.perturbation.expert_rationale or case.perturbation.description) if has_pert else (
+            case.differentials[0].supporting_features[0] if case.differentials and case.differentials[0].supporting_features else ""
+        )
         primary_dx_name = case.differentials[0].name if case.differentials else case.title
         primary_sup = case.differentials[0].supporting_features if case.differentials else [case.brief.presenting_complaint]
+
+        pert_dict = {
+            "trigger_turn": 2,
+            "title": case.perturbation.title,
+            "clinical_update": case.perturbation.description,
+            "description": case.perturbation.description,
+            "findings": case.perturbation.findings,
+            "expected_shifts": case.perturbation.expected_shifts,
+            "rationale": rationale,
+            "expected_hypothesis_shift": rationale,
+        } if has_pert else None
 
         item = {
             "id": cid,
@@ -139,16 +177,8 @@ def export_all():
             "baseline_disclosure_gates": gates_serialized,
             "gates": gates_serialized,
             "red_flags": red_flags_serialized,
-            "perturbation": {
-                "trigger_turn": 2,
-                "title": case.perturbation.title,
-                "clinical_update": case.perturbation.description,
-                "description": case.perturbation.description,
-                "findings": case.perturbation.findings,
-                "expected_shifts": case.perturbation.expected_shifts,
-                "rationale": getattr(case.perturbation, "clinical_rationale", getattr(case.perturbation, "rationale", case.perturbation.description)),
-                "expected_hypothesis_shift": getattr(case.perturbation, "clinical_rationale", getattr(case.perturbation, "rationale", case.perturbation.description)),
-            },
+            "has_perturbation": has_pert,
+            "perturbation": pert_dict,
             "expected_differentials": diffs_serialized,
             "differentials": diffs_serialized,
             "post_encounter_viva": viva_serialized,
@@ -166,7 +196,7 @@ def export_all():
                 "framework": f"Kumar & Clark / Harrison's / Oxford Clinical Approach to {cluster}",
                 "primary_diagnosis": primary_dx_name,
                 "key_features": primary_sup,
-                "etiology": getattr(case.perturbation, "clinical_rationale", getattr(case.perturbation, "rationale", case.perturbation.description)),
+                "etiology": rationale,
                 "complications": [t.trap_name for t in case.cognitive_traps] + [
                     f"Missed { diffs_serialized[1]['name'] }" if len(diffs_serialized) > 1 else "Delayed resuscitation"
                 ],

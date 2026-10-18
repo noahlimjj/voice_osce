@@ -114,13 +114,28 @@ async function runFullGamifiedFlowTests() {
   if (clientSession.sctVote !== 2 || clientSession.sctConcordance !== 100) {
     throw new Error("SCT Likert calculation failed!");
   }
+  const attendingGrid = document.getElementById("attending-perspectives-grid");
+  if (!attendingGrid.innerHTML.includes("Senior Consultant") || !attendingGrid.innerHTML.includes("Director of Resuscitation")) {
+    throw new Error("Attending perspectives failed to render!");
+  }
+  console.log("✓ Senior Attending Perspectives rendered successfully!");
 
   // 7. Test Geeky Medics Crossout Challenge
   chooseCrossoutOption("Uncomplicated Classic Dengue Fever", true);
   console.log("✓ Crossout challenge choice submitted:", clientSession.crossoutChosen, "Correct?", clientSession.crossoutCorrect);
   if (!clientSession.crossoutCorrect) throw new Error("Crossout evaluation failed!");
 
-  // 8. Test Diagnosis & Management Viva Step
+  // 8. Test Sound Effects Engine
+  playAudioTone("redflag");
+  playAudioTone("crossout");
+  playAudioTone("combo");
+  playAudioTone("victory");
+  toggleSoundEffects();
+  if (isSoundFXEnabled) throw new Error("toggleSoundEffects failed!");
+  toggleSoundEffects();
+  console.log("✓ Sound effects synthesizer tested successfully!");
+
+  // 9. Test Diagnosis & Management Viva Step
   openDiagnosisAndVivaStep();
   const dxInput = document.getElementById("dx-input");
   const rfDxInput = document.getElementById("red-flag-dx-input");
@@ -129,7 +144,7 @@ async function runFullGamifiedFlowTests() {
   rfDxInput.value = "Acute Melioidosis or Septic Shock";
   vivaInput.value = "Immediate IV isotonic crystalloid bolus 10-20 mL/kg, monitor hematocrit closely, strictly avoid NSAIDs, do not give prophylactic platelets.";
 
-  // 9. Grade Station & Generate Wordle Scorecard
+  // 10. Grade Station & Generate Wordle Scorecard
   gradeStationNow();
   const scorePct = document.getElementById("card-score-pct").innerText;
   const gradeBadge = document.getElementById("card-grade-badge").innerText;
@@ -140,10 +155,17 @@ async function runFullGamifiedFlowTests() {
   }
   console.log("✓ Wordle-Style Shareable Scorecard Generated:\\n" + latestWordleScorecard);
 
-  // 10. Copy Shareable Scorecard
+  // 11. Copy Shareable Scorecard
   copyShareableScorecard();
 
-  // 11. Test Arena Circuit Mock Exam Mode
+  // 12. Test Daily Challenge Mode
+  startDailyCase();
+  if (!isDailyChallengeMode) throw new Error("startDailyCase failed to set isDailyChallengeMode!");
+  const dailyDay = getDailyDayNumber();
+  const dailyCase = getDailyCase();
+  console.log("✓ Daily Challenge Mode active: #" + dailyDay + " (" + dailyCase.title + ")");
+
+  // 13. Test Arena Circuit Mock Exam Mode
   startArenaCircuit();
   console.log("✓ Arena Circuit initialized. Active?", arenaCircuitState?.active, "Stations:", arenaCircuitState?.stations.length);
   if (!arenaCircuitState || arenaCircuitState.stations.length !== 3) {

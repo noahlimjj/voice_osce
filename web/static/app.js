@@ -348,6 +348,9 @@ let timerInterval = null;
 let targetSeconds = 90;
 let elapsedSeconds = 0;
 let isVoiceOutputEnabled = false; // Default: Silent Text
+let isSoundFXEnabled = true; // Audio cues (chimes, combos, crossout)
+let isDailyChallengeMode = false;
+let audioCtx = null;
 let latestMarkdownReport = "";
 let arenaCircuitState = null; // { active: boolean, stationIndex: number, stationIds: string[], scores: number[] }
 
@@ -411,11 +414,227 @@ function escapeHtml(value) {
 }
 
 // -------------------------------------------------------------
+// SOUND EFFECTS ENGINE (Pure Web Audio API - Zero External Files)
+// -------------------------------------------------------------
+function initSoundEffects() {
+  try {
+    const saved = localStorage.getItem("osceblitz.sound_fx");
+    if (saved !== null) {
+      isSoundFXEnabled = saved === "true";
+    }
+  } catch (_) {}
+  updateSoundFXUI();
+}
+
+function toggleSoundEffects() {
+  isSoundFXEnabled = !isSoundFXEnabled;
+  try {
+    localStorage.setItem("osceblitz.sound_fx", String(isSoundFXEnabled));
+  } catch (_) {}
+  updateSoundFXUI();
+}
+
+function updateSoundFXUI() {
+  const icon = document.getElementById("sound-fx-icon");
+  if (icon) icon.innerText = isSoundFXEnabled ? "🔔" : "🔕";
+  const btn = document.getElementById("sound-fx-toggle-btn");
+  if (btn) btn.title = isSoundFXEnabled ? "Sound Effects: ON (Click to mute)" : "Sound Effects: MUTED (Click to enable)";
+}
+
+function getAudioContext() {
+  if (!audioCtx && typeof window !== "undefined" && (window.AudioContext || window.webkitAudioContext)) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new AC();
+  }
+  if (audioCtx && audioCtx.state === "suspended") {
+    audioCtx.resume().catch(() => {});
+  }
+  return audioCtx;
+}
+
+function playAudioTone(toneType) {
+  if (!isSoundFXEnabled) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    if (toneType === "gate") {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(587.33, now); // D5 gentle ping
+      gain.gain.setValueAtTime(0.06, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.1);
+    } else if (toneType === "redflag") {
+      [587.33, 880.0].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+        gain.gain.setValueAtTime(0.11, now + idx * 0.08);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.08 + 0.14);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.08);
+        osc.stop(now + idx * 0.08 + 0.14);
+      });
+    } else if (toneType === "crossout") {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(520, now);
+      osc.frequency.exponentialRampToValueAtTime(260, now + 0.12);
+      gain.gain.setValueAtTime(0.09, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.12);
+    } else if (toneType === "combo") {
+      [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+        gain.gain.setValueAtTime(0.08, now + idx * 0.06);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.12);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + idx * 0.06);
+        osc.stop(now + idx * 0.06 + 0.12);
+      });
+    } else if (toneType === "victory") {
+      [523.25, 659.25, 783.99, 1046.5].forEach((freq) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now);
+        gain.gain.setValueAtTime(0.06, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.45);
+      });
+    }
+  } catch (_) {}
+}
+
+// -------------------------------------------------------------
+// DAILY OSCE STATION CHALLENGE (Doctordle / WhatsTheDx Style)
+// -------------------------------------------------------------
+function getDailyDayNumber() {
+  const epoch = new Date("2026-01-01T00:00:00Z").getTime();
+  const diffDays = Math.floor((Date.now() - epoch) / (1000 * 60 * 60 * 24));
+  return Math.max(1, diffDays);
+}
+
+function getDailyCase() {
+  const cases = currentCases.length > 0 ? currentCases : Object.values(ALL_CASES_MAP);
+  if (!cases || cases.length === 0) return null;
+  const dayNum = getDailyDayNumber();
+  const idx = dayNum % cases.length;
+  return cases[idx];
+}
+
+function initDailyCaseBanner() {
+  const dCase = getDailyCase();
+  if (!dCase) return;
+  const dayNum = getDailyDayNumber();
+  const dayBadge = document.getElementById("daily-day-badge");
+  if (dayBadge) dayBadge.innerText = `Daily #${dayNum}`;
+
+  const titleEl = document.getElementById("daily-case-title");
+  if (titleEl) {
+    titleEl.innerText = isBlindMode ? dCase.blindPrompt : dCase.title;
+  }
+
+  const descEl = document.getElementById("daily-case-desc");
+  if (descEl) {
+    descEl.innerText = `Specialty: ${dCase.specialty} • Target: ${dCase.targetSeconds}s • Clear safety red flags in under 5 Par turns.`;
+  }
+
+  const vitalsEl = document.getElementById("daily-case-vitals");
+  if (vitalsEl) {
+    vitalsEl.innerText = dCase.compactVitals || "Vitals recorded at triage";
+  }
+}
+
+function startDailyCase() {
+  const dCase = getDailyCase();
+  if (!dCase) {
+    startRandomCase();
+    return;
+  }
+  launchInstantBlitz(dCase.id, true);
+}
+
+// -------------------------------------------------------------
+// STREAK TRACKING & PERSISTENCE (Doctordle / WhatsTheDx Style)
+// -------------------------------------------------------------
+function getStreakData() {
+  try {
+    const raw = localStorage.getItem("osceblitz.streak_data");
+    if (raw) return JSON.parse(raw);
+  } catch (_) {}
+  return { streak: 0, lastDay: 0 };
+}
+
+function recordStreakSuccess() {
+  const data = getStreakData();
+  const currentDay = getDailyDayNumber();
+  if (data.lastDay === currentDay) {
+    return data.streak;
+  }
+  if (data.lastDay === currentDay - 1) {
+    data.streak += 1;
+  } else {
+    data.streak = 1;
+  }
+  data.lastDay = currentDay;
+  try {
+    localStorage.setItem("osceblitz.streak_data", JSON.stringify(data));
+  } catch (_) {}
+  updateStreakUI();
+  return data.streak;
+}
+
+function updateStreakUI() {
+  const data = getStreakData();
+  const pill = document.getElementById("streak-counter-pill");
+  if (pill) {
+    pill.innerText = `🔥 ${data.streak} Streak`;
+  }
+}
+
+// -------------------------------------------------------------
+// INTERACTIVE CLINICAL MNEMONIC INSERTER
+// -------------------------------------------------------------
+function insertFrameworkQuery(queryStr) {
+  const input = document.getElementById("candidate-text-input");
+  if (!input) return;
+  input.value = queryStr;
+  input.focus();
+  input.classList.add("ring-2", "ring-emerald-400");
+  setTimeout(() => {
+    input.classList.remove("ring-2", "ring-emerald-400");
+  }, 400);
+}
+
+// -------------------------------------------------------------
 // INITIALIZATION
 // -------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", async () => {
   initTheme();
+  initSoundEffects();
   await loadCases();
+  initDailyCaseBanner();
+  updateStreakUI();
   renderSymptomApproachDrawer(activeApproachCluster);
 
   const textInput = document.getElementById("candidate-text-input");
@@ -913,6 +1132,7 @@ function toggleBlindMode() {
       pill.className = "px-1.5 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-400 border border-zinc-700";
     }
   }
+  initDailyCaseBanner();
   renderCasesGrid(getFilteredCases());
 }
 
@@ -1017,7 +1237,8 @@ function getFreshCaseCopy(caseId) {
   return copy;
 }
 
-async function launchInstantBlitz(caseId) {
+async function launchInstantBlitz(caseId, isDaily = false) {
+  isDailyChallengeMode = Boolean(isDaily);
   activeCase = getFreshCaseCopy(caseId);
   if (!activeCase) return;
   await startConsultationSession();
@@ -1304,6 +1525,17 @@ function executeBlitzTurn(queryText) {
   appendMinimalistFindingCard(result, queryText);
   updateGameCountersUI();
 
+  // Audio tone cues for clinical findings
+  const newlyRf = result.newlyUnlocked.filter(g => g.mandatory_for_safety || g.category === "red_flag");
+  if (newlyRf.length > 0) {
+    playAudioTone("redflag");
+    if (clientSession.comboCount >= 2) {
+      setTimeout(() => playAudioTone("combo"), 180);
+    }
+  } else if (result.newlyUnlocked.length > 0) {
+    playAudioTone("gate");
+  }
+
   if (isVoiceOutputEnabled) {
     const spokenText = result.newlyUnlocked.length > 0
       ? result.newlyUnlocked.map(g => g.response_text || g.response).join(" ")
@@ -1514,6 +1746,7 @@ function submitSctTwistVote(value) {
 
   // Render Attending Panel Consensus Distribution (Practicum Script style)
   renderSctConsensusDistribution(expectedShift, value);
+  renderAttendingPerspectives(expectedShift);
 
   // Reveal consensus panel & expert rationale
   const consensusPanel = document.getElementById("twist-consensus-panel");
@@ -1585,6 +1818,84 @@ function renderSctConsensusDistribution(expectedVal, userVote) {
   }).join("");
 }
 
+function renderAttendingPerspectives(expectedShift) {
+  const container = document.getElementById("attending-perspectives-grid");
+  if (!container || !activeCase) return;
+
+  const pert = activeCase.perturbation || {};
+  const specialty = activeCase.specialty || "Internal Medicine";
+  const caseTitle = activeCase.title || "this condition";
+
+  let specialistQuote = "";
+  let emQuote = "";
+  let examinerQuote = "";
+
+  if (expectedShift > 0) {
+    specialistQuote = pert.expert_rationale 
+      ? (pert.expert_rationale.length > 170 ? pert.expert_rationale.slice(0, 167) + "..." : pert.expert_rationale)
+      : `This clinical finding strongly supports the working diagnosis of ${caseTitle}. Pre-test probability rises significantly.`;
+    emQuote = "In emergency triage, this acute update confirms our priority resuscitation track. Do not delay definitive therapy.";
+    examinerQuote = "Excellent clinical discrimination. Many candidates fail to connect this bedside sign with the underlying pathophysiology.";
+  } else if (expectedShift < 0) {
+    specialistQuote = pert.expert_rationale
+      ? (pert.expert_rationale.length > 170 ? pert.expert_rationale.slice(0, 167) + "..." : pert.expert_rationale)
+      : `Crucial negative finding that substantially reduces the likelihood of the primary differential. You must pivot to alternative etiologies.`;
+    emQuote = "Safety pivot required immediately. Re-evaluate ABCDEs and consider atypical or life-threatening mimics.";
+    examinerQuote = "Diagnostic trap avoided! Candidates who anchor on their initial hypothesis lose crucial points here.";
+  } else {
+    specialistQuote = pert.expert_rationale
+      ? (pert.expert_rationale.length > 170 ? pert.expert_rationale.slice(0, 167) + "..." : pert.expert_rationale)
+      : `Non-specific finding with a likelihood ratio close to 1.0. It neither confirms nor excludes the working diagnosis.`;
+    emQuote = "Continue continuous monitoring while maintaining a broad differential. Do not let neutral findings distract from red flags.";
+    examinerQuote = "A classic distractor. Top candidates recognize neutral evidence and avoid diagnostic premature closure.";
+  }
+
+  const attendings = [
+    {
+      name: `Dr. K. Tan, MBBS, FRCP`,
+      role: `Senior Consultant (${specialty})`,
+      avatar: "👨‍⚕️",
+      quote: specialistQuote,
+      border: "border-sky-500/30",
+      badge: "Specialty Lead"
+    },
+    {
+      name: `Dr. E. Ryan, MBBS, FACEM`,
+      role: `Director of Resuscitation & EM`,
+      avatar: "⚡",
+      quote: emQuote,
+      border: "border-rose-500/30",
+      badge: "Acute Triage"
+    },
+    {
+      name: `Dr. S. K. Wong, MBBS, MRCP`,
+      role: `Clinical Lead OSCE Examiner`,
+      avatar: "📋",
+      quote: examinerQuote,
+      border: "border-emerald-500/30",
+      badge: "Examiner Rubric"
+    }
+  ];
+
+  container.innerHTML = attendings.map(a => `
+    <div class="card-surface p-3 rounded-xl border ${a.border} space-y-1.5 flex flex-col justify-between text-xs">
+      <div class="space-y-1">
+        <div class="flex items-center justify-between">
+          <span class="font-bold text-zinc-200 flex items-center gap-1.5">
+            <span>${a.avatar}</span>
+            <span>${escapeHtml(a.name)}</span>
+          </span>
+          <span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-zinc-300 font-semibold">${a.badge}</span>
+        </div>
+        <div class="text-[11px] text-zinc-400 font-mono">${escapeHtml(a.role)}</div>
+      </div>
+      <p class="text-zinc-300 italic text-[11px] leading-relaxed pt-1 border-t border-white/5">
+        “${escapeHtml(a.quote)}”
+      </p>
+    </div>
+  `).join("");
+}
+
 // -------------------------------------------------------------
 // GEEKY MEDICS "CROSSOUT!" ELIMINATION CHALLENGE
 // -------------------------------------------------------------
@@ -1644,6 +1955,7 @@ function chooseCrossoutOption(name, isRuledOut) {
   document.querySelectorAll(".crossout-option").forEach(b => b.disabled = true);
 
   if (isRuledOut) {
+    playAudioTone("crossout");
     if (btn) {
       btn.className = "crossout-option p-3 rounded-xl bg-rose-500/20 border border-rose-500 text-left text-xs sm:text-sm font-semibold text-rose-300 min-h-[44px] flex items-center justify-between line-through";
     }
@@ -2236,6 +2548,7 @@ function renderFinalScorecard(dxText, redFlagDxText, planText) {
   } else if (totalScore >= 85 && isUnderPar) {
     grade = "Distinction";
     gradeBadgeText = "Distinction (Eagle 🦅)";
+    playAudioTone("victory");
   } else if (totalScore >= 85) {
     grade = "Distinction";
     gradeBadgeText = "Distinction (Birdie 🐦)";
@@ -2272,10 +2585,13 @@ function renderFinalScorecard(dxText, redFlagDxText, planText) {
       : "text-xs sm:text-sm font-bold px-3 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30";
   }
 
-  // Persist attempt
+  // Persist attempt & update daily streak
   let progressNote = "";
   if (!clientSession.progressRecorded) {
     clientSession.progressRecorded = recordProgress(activeCase.id, totalScore, elapsedSeconds);
+    if (safetyPass && totalScore >= 70) {
+      recordStreakSuccess();
+    }
   }
   const pr = clientSession.progressRecorded;
   if (pr) {
@@ -2496,10 +2812,15 @@ function renderFinalScorecard(dxText, redFlagDxText, planText) {
   const rfSquares = redFlagGates.map(g => clientSession.unlockedGateKeys.has(g.key) ? "🟩" : "🟥").join("");
   const parIcon = isUnderPar ? "🦅 Eagle" : "⛳ Par";
   const sctIcon = sctConcordanceVal >= 75 ? "🟩" : "🟨";
+  const streakData = getStreakData();
+  const streakLine = streakData.streak > 0 ? ` | 🔥 ${streakData.streak} Streak` : "";
+  const headerLine = isDailyChallengeMode
+    ? `⚡ OSCEBlitz Daily #${getDailyDayNumber()} — ${activeCase.title}`
+    : `⚡ OSCEBlitz #${activeCase.id} — ${activeCase.title}`;
 
   latestWordleScorecard = [
-    `⚡ OSCEBlitz #${activeCase.id} — ${activeCase.title}`,
-    `🎯 Turn ${clientSession.turnCount}/${clientSession.parQuestions} Par (${parIcon}) | Score: ${totalScore}% (${grade})`,
+    headerLine,
+    `🎯 Turn ${clientSession.turnCount}/${clientSession.parQuestions} Par (${parIcon})${streakLine} | Score: ${totalScore}% (${grade})`,
     `🛡️ Safety Red Flags: ${rfSquares} (${rfIndependent}/${redFlagGates.length})`,
     `💡 SCT Bedside Twist: ${sctIcon} ${sctConcordanceVal}% Concordance`,
     `⏱️ Time: ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)} target`,

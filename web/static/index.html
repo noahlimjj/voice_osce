@@ -335,6 +335,16 @@
         </button>
 
         <button
+          onclick="toggleSoundEffects()"
+          id="sound-fx-toggle-btn"
+          class="px-2.5 sm:px-3 py-2 rounded-xl card-surface hover:border-zinc-500 text-xs sm:text-sm text-zinc-200 flex items-center justify-center transition min-h-[40px] min-w-[40px]"
+          title="Toggle Sound Effects (Chimes, Combos, Crossout)"
+          aria-label="Toggle Sound Effects"
+        >
+          <span id="sound-fx-icon">🔔</span>
+        </button>
+
+        <button
           onclick="toggleThemeMode()"
           id="theme-toggle-btn"
           class="px-2.5 sm:px-3 py-2 rounded-xl card-surface hover:border-zinc-500 text-xs sm:text-sm text-zinc-200 flex items-center justify-center transition min-h-[40px] min-w-[40px]"
@@ -435,26 +445,52 @@
         </button>
       </div>
 
-      <!-- Arena Circuit & Daily Challenge Hero (OSCE Arena / RehearseMD / Doctordle) -->
-      <div id="arena-banner" class="card-surface rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 border-l-emerald-400">
-        <div class="space-y-1 flex-1">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">⚡ Arena Circuit Challenge</span>
-            <span class="text-xs text-zinc-400">• 3 Stations Back-to-Back</span>
-            <span id="streak-counter-pill" class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">🔥 0 Streak</span>
+      <!-- Arena Circuit & Daily Challenge Hero Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <!-- Card 1: Daily OSCE Station Challenge (Doctordle / WhatsTheDx) -->
+        <div id="daily-case-banner" class="card-surface rounded-xl p-4 sm:p-5 flex flex-col justify-between gap-3 border-l-4 border-l-sky-400">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-mono uppercase tracking-wider text-sky-400 font-bold">📅 Case of the Day</span>
+              <span id="daily-day-badge" class="text-xs font-mono px-2 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30 font-semibold">Daily Station</span>
+            </div>
+            <h2 id="daily-case-title" class="text-sm sm:text-base font-bold text-white">Daily Standardized OSCE Challenge</h2>
+            <p id="daily-case-desc" class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+              Today's standardized clinical case. Clear red flags within 5 Par turns and generate your daily Wordle scorecard.
+            </p>
           </div>
-          <h2 class="text-sm sm:text-base font-bold text-white">High-Stakes Clinical Reasoning Circuit</h2>
-          <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
-            Formulate targeted clinical questions yourself, clear critical safety red flags, interpret bedside diagnostic twists, and avoid cognitive traps.
-          </p>
+          <div class="pt-1 flex items-center justify-between">
+            <span id="daily-case-vitals" class="text-xs font-mono text-zinc-400 truncate">Vitals at triage</span>
+            <button
+              onclick="startDailyCase()"
+              class="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-zinc-950 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-sm min-h-[40px] shrink-0"
+            >
+              <span>Play Daily Case →</span>
+            </button>
+          </div>
         </div>
-        <div class="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
-          <button
-            onclick="startArenaCircuit()"
-            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm min-h-[42px]"
-          >
-            <span>⚡ Start 3-Station Circuit</span>
-          </button>
+
+        <!-- Card 2: Arena Circuit (3 Stations Mock Exam) -->
+        <div id="arena-banner" class="card-surface rounded-xl p-4 sm:p-5 flex flex-col justify-between gap-3 border-l-4 border-l-emerald-400">
+          <div class="space-y-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">⚡ Arena Circuit Challenge</span>
+              <span class="text-xs text-zinc-400">• 3 Stations Back-to-Back</span>
+              <span id="streak-counter-pill" class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">🔥 0 Streak</span>
+            </div>
+            <h2 class="text-sm sm:text-base font-bold text-white">Timed Multi-Station Mock Circuit</h2>
+            <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+              Experience the pressure of actual clinical finals. 3 random stations across acute specialties with running score.
+            </p>
+          </div>
+          <div class="pt-1 flex items-center justify-end">
+            <button
+              onclick="startArenaCircuit()"
+              class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs sm:text-sm transition flex items-center gap-1.5 shadow-sm min-h-[40px] shrink-0"
+            >
+              <span>⚡ Start 3-Station Circuit</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -665,23 +701,62 @@
         </div>
 
         <div id="clinical-framework-guide" class="hidden bg-[#090A10] hairline-border rounded-xl p-3.5 space-y-2 text-xs text-zinc-300">
-          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-            <div class="space-y-1">
-              <span class="font-bold text-emerald-400 uppercase tracking-wider text-[11px]">SOCRATES History</span>
-              <p class="text-zinc-400 leading-relaxed text-[11px]">Site, Onset, Character, Radiation, Associations, Timing, Exacerbating/Relieving, Severity (1-10).</p>
-            </div>
-            <div class="space-y-1">
-              <span class="font-bold text-rose-400 uppercase tracking-wider text-[11px]">Safety Red Flags</span>
-              <p class="text-zinc-400 leading-relaxed text-[11px]">Syncope, tearing back pain, hemoptysis, breathlessness, neurological deficits, bleeding.</p>
-            </div>
-            <div class="space-y-1">
-              <span class="font-bold text-sky-400 uppercase tracking-wider text-[11px]">PMHx &amp; Meds</span>
-              <p class="text-zinc-400 leading-relaxed text-[11px]">Hypertension, Diabetes, IHD, CKD, Anticoagulants/Antiplatelets, Allergies.</p>
-            </div>
-            <div class="space-y-1">
-              <span class="font-bold text-amber-400 uppercase tracking-wider text-[11px]">Systemic / Social</span>
-              <p class="text-zinc-400 leading-relaxed text-[11px]">Fever, chills, travel, smoking, alcohol, army/occupational exposures, family history.</p>
-            </div>
+          <div class="text-[11px] font-mono text-zinc-400 pb-1 hairline-border-b flex items-center justify-between">
+            <span>💡 Tap any mnemonic block to insert rapid inquiry into the command bar</span>
+            <span class="text-emerald-400 font-semibold hidden sm:inline">1-Tap Formulation</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
+            <button
+              type="button"
+              onclick="insertFrameworkQuery('site onset character radiation associated symptoms timing exacerbating relieving severity?')"
+              class="text-left p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 hover:border-emerald-400 transition space-y-1 group"
+              title="Click to insert SOCRATES inquiry"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-emerald-400 uppercase tracking-wider text-[11px]">SOCRATES</span>
+                <span class="text-[10px] font-mono text-emerald-400 opacity-0 group-hover:opacity-100 transition">+ Insert</span>
+              </div>
+              <p class="text-zinc-300 leading-relaxed text-[11px]">Site, Onset, Character, Radiation, Associations, Timing, Relieving, Severity (1-10).</p>
+            </button>
+
+            <button
+              type="button"
+              onclick="insertFrameworkQuery('syncope tearing back pain hemoptysis severe breathlessness focal neuro deficits bleeding?')"
+              class="text-left p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 hover:border-rose-400 transition space-y-1 group"
+              title="Click to insert Safety Red Flag screen"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-rose-400 uppercase tracking-wider text-[11px]">Safety Red Flags</span>
+                <span class="text-[10px] font-mono text-rose-400 opacity-0 group-hover:opacity-100 transition">+ Insert</span>
+              </div>
+              <p class="text-zinc-300 leading-relaxed text-[11px]">Syncope, tearing back pain, hemoptysis, breathlessness, neuro deficits, bleeding.</p>
+            </button>
+
+            <button
+              type="button"
+              onclick="insertFrameworkQuery('past medical history diabetes hypertension surgery blood thinners allergies compliance?')"
+              class="text-left p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/20 hover:border-sky-400 transition space-y-1 group"
+              title="Click to insert Past History and Medication inquiry"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-sky-400 uppercase tracking-wider text-[11px]">PMHx &amp; Meds</span>
+                <span class="text-[10px] font-mono text-sky-400 opacity-0 group-hover:opacity-100 transition">+ Insert</span>
+              </div>
+              <p class="text-zinc-300 leading-relaxed text-[11px]">Hypertension, Diabetes, IHD, CKD, Anticoagulants, Antiplatelets, Allergies.</p>
+            </button>
+
+            <button
+              type="button"
+              onclick="insertFrameworkQuery('fever chills night sweats weight loss travel smoking alcohol army camp occupation family history?')"
+              class="text-left p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:border-amber-400 transition space-y-1 group"
+              title="Click to insert Systemic and Social inquiry"
+            >
+              <div class="flex items-center justify-between">
+                <span class="font-bold text-amber-400 uppercase tracking-wider text-[11px]">Systemic / Social</span>
+                <span class="text-[10px] font-mono text-amber-400 opacity-0 group-hover:opacity-100 transition">+ Insert</span>
+              </div>
+              <p class="text-zinc-300 leading-relaxed text-[11px]">Fever, chills, travel, smoking, alcohol, army camp, exposures, family history.</p>
+            </button>
           </div>
         </div>
       </div>
@@ -740,6 +815,12 @@
           </div>
           <div id="twist-rationale-box" class="pt-2 text-xs sm:text-sm text-zinc-300 leading-relaxed border-t border-white/5">
             <!-- Rationale shown after vote -->
+          </div>
+          <div id="attending-commentary-section" class="pt-2 border-t border-white/5 space-y-2">
+            <span class="font-bold text-sky-400 uppercase tracking-wider text-[11px]">Senior Attending Perspectives</span>
+            <div id="attending-perspectives-grid" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <!-- Populated by JS -->
+            </div>
           </div>
         </div>
 

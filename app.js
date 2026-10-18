@@ -829,9 +829,9 @@ function filterCases(category) {
   activeFilterCategory = category;
   document.querySelectorAll(".filter-tab").forEach(tab => {
     if (tab.dataset.specialty === category) {
-      tab.className = "filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-950 transition";
+      tab.className = "filter-tab shrink-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-zinc-100 text-zinc-950 transition min-h-[42px]";
     } else {
-      tab.className = "filter-tab shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-zinc-200 card-surface transition";
+      tab.className = "filter-tab shrink-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-zinc-300 hover:text-white card-surface transition min-h-[42px]";
     }
   });
 
@@ -897,30 +897,30 @@ function renderCasesGrid(cases) {
   cases.forEach(c => {
     const card = document.createElement("button");
     card.type = "button";
-    card.className = "card-surface-interactive text-left rounded-xl p-4 flex flex-col justify-between gap-3.5 cursor-pointer group";
+    card.className = "card-surface-interactive text-left rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-4 cursor-pointer group min-h-[160px]";
     card.onclick = () => launchInstantBlitz(c.id);
     const rec = progress[c.id];
     const footerAction = rec
-      ? `<span class="font-mono text-[10px] px-1.5 py-0.5 rounded border shrink-0 ${scoreTone(rec.best)}" title="Best of ${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"}">Best ${rec.best}%</span>`
-      : `<span class="font-medium text-zinc-300 group-hover:text-emerald-400 shrink-0 transition">Start →</span>`;
+      ? `<span class="font-mono text-xs font-bold px-2.5 py-1 rounded-md border shrink-0 ${scoreTone(rec.best)}" title="Best of ${rec.attempts} attempt${rec.attempts === 1 ? "" : "s"}">Best ${rec.best}%</span>`
+      : `<span class="font-bold text-zinc-200 group-hover:text-emerald-400 shrink-0 transition text-xs sm:text-sm">Start →</span>`;
 
     const topTag = c.isSgClassic
-      ? `<span class="text-[11px] font-medium text-zinc-300"><span class="sg-badge">SG</span> ${escapeHtml(c.clusterLabel)}</span>`
-      : `<span class="text-[11px] font-medium text-zinc-400">${escapeHtml(c.shortSpecialty)} • ${escapeHtml(c.clusterLabel)}</span>`;
+      ? `<span class="text-xs sm:text-sm font-semibold text-zinc-200"><span class="sg-badge mr-1">SG</span> ${escapeHtml(c.clusterLabel)}</span>`
+      : `<span class="text-xs sm:text-sm font-semibold text-zinc-300">${escapeHtml(c.shortSpecialty)} • ${escapeHtml(c.clusterLabel)}</span>`;
 
     const diffBadge = c.difficulty === "Easy"
-      ? `<span class="font-mono text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">Easy • ${c.targetSeconds}s</span>`
+      ? `<span class="font-mono text-xs font-bold text-emerald-300 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-md">Easy • ${c.targetSeconds}s</span>`
       : c.difficulty === "Hard"
-      ? `<span class="font-mono text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/25 px-1.5 py-0.5 rounded">Hard • ${c.targetSeconds}s</span>`
-      : `<span class="font-mono text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded">Int • ${c.targetSeconds}s</span>`;
+      ? `<span class="font-mono text-xs font-bold text-rose-300 bg-rose-500/15 border border-rose-500/30 px-2 py-0.5 rounded-md">Hard • ${c.targetSeconds}s</span>`
+      : `<span class="font-mono text-xs font-bold text-amber-300 bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 rounded-md">Int • ${c.targetSeconds}s</span>`;
 
     const displayTitle = isBlindMode ? c.blindPrompt : c.title;
     const subtitleHtml = isBlindMode
-      ? `<p class="text-[11px] text-zinc-500 mt-1 truncate">${escapeHtml(c.setting)}</p>`
-      : `<p class="text-[11px] text-zinc-400 mt-1 line-clamp-1">${escapeHtml(c.blindPrompt)}</p>`;
+      ? `<p class="text-xs sm:text-sm text-zinc-400 mt-1.5 truncate">${escapeHtml(c.setting)}</p>`
+      : `<p class="text-xs sm:text-sm text-zinc-300 mt-1.5 line-clamp-2">${escapeHtml(c.blindPrompt)}</p>`;
 
     card.innerHTML = `
-      <div class="space-y-2.5">
+      <div class="space-y-3">
         <!-- 1. Top Row: Specialty/Symptom Tag + Target Time & Difficulty Pill -->
         <div class="flex items-center justify-between gap-2">
           ${topTag}
@@ -929,7 +929,7 @@ function renderCasesGrid(cases) {
 
         <!-- 2. Center Title: Unspoiled Presenting Complaint (or Diagnosis if Blind Mode off) -->
         <div>
-          <h3 class="text-sm font-semibold text-zinc-100 group-hover:text-emerald-400 transition leading-snug">
+          <h3 class="text-base sm:text-lg font-bold text-zinc-100 group-hover:text-emerald-400 transition leading-snug">
             ${escapeHtml(displayTitle)}
           </h3>
           ${subtitleHtml}
@@ -937,8 +937,8 @@ function renderCasesGrid(cases) {
       </div>
 
       <!-- 3. Subtle Footer: Vitals Preview + Start -> -->
-      <div class="pt-2.5 hairline-border-t flex items-center justify-between gap-2 text-[11px]">
-        <span class="font-mono text-zinc-500 truncate">${escapeHtml(c.compactVitals)}</span>
+      <div class="pt-3 hairline-border-t flex items-center justify-between gap-2 text-xs sm:text-sm">
+        <span class="font-mono text-zinc-300 font-medium truncate text-xs sm:text-sm">${escapeHtml(c.compactVitals)}</span>
         ${footerAction}
       </div>
     `;
@@ -1303,7 +1303,7 @@ function appendMinimalistFindingCard(result, queryText, macroBadge) {
   if (!container) return;
 
   const card = document.createElement("div");
-  card.className = "card-surface rounded-xl p-3.5 space-y-2 text-xs";
+  card.className = "card-surface rounded-xl p-4 sm:p-5 space-y-3 text-sm sm:text-base";
 
   const labelText = macroBadge ? macroBadge : queryText;
   let itemsHtml = "";
@@ -1313,17 +1313,17 @@ function appendMinimalistFindingCard(result, queryText, macroBadge) {
   positiveGates.forEach(g => {
     const isRedFlag = g.mandatory_for_safety || g.category === "red_flag";
     const rfTag = isRedFlag
-      ? `<span class="text-[10px] font-mono px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 ml-1.5">Red Flag</span>`
+      ? `<span class="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-rose-500/20 text-rose-300 ml-2">Red Flag</span>`
       : "";
     const resp = g.response_text || g.response || "";
     itemsHtml += `
-      <div class="flex items-start gap-2.5 leading-relaxed">
-        <span class="font-mono text-emerald-400 font-bold shrink-0 mt-0.5">✓</span>
-        <div class="text-zinc-100">
-          <span class="font-medium text-zinc-300">${escapeHtml(formatGateTitle(g.key))}:</span>
+      <div class="flex items-start gap-3 leading-relaxed">
+        <span class="font-mono text-emerald-400 font-bold shrink-0 mt-0.5 text-base sm:text-lg">✓</span>
+        <div class="text-zinc-100 flex-1">
+          <span class="font-semibold text-zinc-200 text-sm sm:text-base">${escapeHtml(formatGateTitle(g.key))}:</span>
           ${rfTag}
-          <span class="ml-1 text-zinc-100">${escapeHtml(resp)}</span>
-          ${g.examiner_note ? `<div class="mt-1 text-[11px] text-zinc-500"><span class="font-mono uppercase tracking-wide">Exam:</span> ${escapeHtml(g.examiner_note)}</div>` : ""}
+          <span class="ml-1 text-white">${escapeHtml(resp)}</span>
+          ${g.examiner_note ? `<div class="mt-2 text-xs sm:text-sm text-zinc-200 bg-[#090A10] p-3 rounded-xl border border-white/5 leading-relaxed"><span class="font-mono uppercase tracking-wide font-bold text-zinc-400">Exam:</span> ${escapeHtml(g.examiner_note)}</div>` : ""}
         </div>
       </div>
     `;
@@ -1332,16 +1332,16 @@ function appendMinimalistFindingCard(result, queryText, macroBadge) {
   // Pertinent negatives (–)
   result.pertinentNegatives.forEach(n => {
     itemsHtml += `
-      <div class="flex items-start gap-2.5 leading-relaxed text-zinc-500">
-        <span class="font-mono text-zinc-500 font-bold shrink-0">–</span>
-        <div><span class="font-medium text-zinc-400">${escapeHtml(n.keyword)}:</span> ${escapeHtml(n.detail)}</div>
+      <div class="flex items-start gap-3 leading-relaxed text-zinc-400 text-xs sm:text-sm">
+        <span class="font-mono text-zinc-500 font-bold shrink-0 mt-0.5">–</span>
+        <div><span class="font-semibold text-zinc-300">${escapeHtml(n.keyword)}:</span> ${escapeHtml(n.detail)}</div>
       </div>
     `;
   });
 
   if (!itemsHtml) {
     itemsHtml = `
-      <div class="flex items-start gap-2.5 text-zinc-500">
+      <div class="flex items-start gap-3 text-zinc-400 text-xs sm:text-sm">
         <span class="font-mono text-zinc-500 font-bold shrink-0">–</span>
         <span>No additional positive findings for "${escapeHtml(queryText)}".</span>
       </div>
@@ -1349,11 +1349,11 @@ function appendMinimalistFindingCard(result, queryText, macroBadge) {
   }
 
   card.innerHTML = `
-    <div class="flex items-center justify-between text-[11px] text-zinc-500 hairline-border-b pb-1.5">
-      <span class="font-mono truncate max-w-md">Query: ${escapeHtml(labelText)}</span>
-      <span>${result.newlyUnlocked.length > 0 ? `+${result.newlyUnlocked.length} new` : "reviewed"}</span>
+    <div class="flex items-center justify-between text-xs sm:text-sm text-zinc-400 hairline-border-b pb-2">
+      <span class="font-mono font-medium truncate max-w-md">Query: ${escapeHtml(labelText)}</span>
+      <span class="font-mono text-zinc-400">${result.newlyUnlocked.length > 0 ? `+${result.newlyUnlocked.length} new` : "reviewed"}</span>
     </div>
-    <div class="space-y-1.5 pt-0.5">
+    <div class="space-y-2 pt-1">
       ${itemsHtml}
     </div>
   `;
@@ -1490,12 +1490,12 @@ function renderGateChecklist() {
     btn.type = "button";
     btn.onclick = () => unlockSingleGateByClick(g.key);
     btn.className = isUnlocked
-      ? "text-left px-2.5 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] flex items-center justify-between gap-2 transition"
-      : "text-left px-2.5 py-1.5 rounded-lg bg-[#090A10] hairline-border hover:border-zinc-700 text-zinc-400 text-[11px] flex items-center justify-between gap-2 transition";
+      ? "text-left px-3.5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-semibold flex items-center justify-between gap-2.5 transition min-h-[44px]"
+      : "text-left px-3.5 py-2.5 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-zinc-300 text-xs sm:text-sm font-medium flex items-center justify-between gap-2.5 transition min-h-[44px]";
 
     btn.innerHTML = `
       <span class="truncate">${isUnlocked ? "✓" : (isRf ? "🚨" : "+")} ${escapeHtml(formatGateTitle(g.key))}</span>
-      <span class="font-mono text-[10px] opacity-70">${escapeHtml(g.category)}</span>
+      <span class="font-mono text-xs text-zinc-400 font-semibold">${escapeHtml(g.category)}</span>
     `;
     container.appendChild(btn);
   });
@@ -1661,7 +1661,7 @@ function openDiagnosisAndVivaStep() {
       <button
         type="button"
         onclick="appendDiagnosisChip('${escapeHtml(chip)}')"
-        class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-500 hover:text-white text-[11px] text-zinc-300 transition"
+        class="px-3.5 py-2 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-400 hover:text-white text-xs sm:text-sm font-medium text-zinc-200 transition min-h-[40px]"
       >
         + ${escapeHtml(chip)}
       </button>
@@ -1674,9 +1674,9 @@ function openDiagnosisAndVivaStep() {
     promptsEl.classList.add("hidden");
     const questions = activeCase.viva_questions || activeCase.post_encounter_viva || [];
     promptsEl.innerHTML = questions.map((q, idx) => `
-      <div>
-        <div class="font-medium text-zinc-200">Q${idx + 1}: ${escapeHtml(q.prompt || q.question || "")}</div>
-        <div class="text-[11px] text-zinc-500 mt-0.5">Key points: ${escapeHtml((q.key_points_required || q.key_points || []).join(" • "))}</div>
+      <div class="space-y-1">
+        <div class="font-bold text-zinc-100 text-xs sm:text-sm">Q${idx + 1}: ${escapeHtml(q.prompt || q.question || "")}</div>
+        <div class="text-xs sm:text-sm text-zinc-300 leading-relaxed">Key points: ${escapeHtml((q.key_points_required || q.key_points || []).join(" • "))}</div>
       </div>
     `).join("");
   }
@@ -1898,11 +1898,11 @@ function renderFinalScorecard(dxText, planText) {
       const pct = Math.max(0, Math.min(100, Math.round((m.ratio || 0) * 100)));
       const bar = pct >= 85 ? "bg-emerald-400" : pct >= 65 ? "bg-sky-400" : pct >= 50 ? "bg-amber-400" : "bg-rose-400";
       return `
-      <div class="bg-[#090A10] hairline-border rounded-lg p-3 space-y-1">
-        <div class="text-[11px] text-zinc-400">${escapeHtml(m.label)}</div>
-        <div class="font-mono text-sm font-semibold text-zinc-100">${escapeHtml(m.val)}</div>
-        <div class="h-1 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full rounded-full ${bar}" style="width:${pct}%"></div></div>
-        <div class="text-[10px] font-mono text-zinc-500">${escapeHtml(m.sub)}</div>
+      <div class="bg-[#090A10] hairline-border rounded-xl p-3.5 space-y-1.5">
+        <div class="text-xs font-semibold text-zinc-300">${escapeHtml(m.label)}</div>
+        <div class="font-mono text-base sm:text-lg font-bold text-zinc-100">${escapeHtml(m.val)}</div>
+        <div class="h-1.5 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full rounded-full ${bar}" style="width:${pct}%"></div></div>
+        <div class="text-xs font-mono text-zinc-400 font-medium">${escapeHtml(m.sub)}</div>
       </div>`;
     }).join("");
   }
@@ -1915,16 +1915,19 @@ function renderFinalScorecard(dxText, planText) {
       const prompted = cleared && assistedKeys.has(g.key);
       const resp = g.examiner_note || g.response_text || g.response || "";
       const statusBadge = (cleared && !prompted)
-        ? '<span class="text-[10px] font-mono text-emerald-400">✓ Cleared</span>'
+        ? '<span class="text-xs font-mono font-bold text-emerald-400">✓ Cleared</span>'
         : prompted
-        ? '<span class="text-[10px] font-mono text-zinc-500">[Revealed by assist — 0 pts]</span>'
-        : '<span class="text-[10px] font-mono text-rose-400">Missed</span>';
+        ? '<span class="text-xs font-mono text-zinc-400 font-medium">[Revealed by assist — 0 pts]</span>'
+        : '<span class="text-xs font-mono font-bold text-rose-400">Missed</span>';
       return `
-        <div class="bg-[#090A10] hairline-border rounded-lg p-2.5 flex items-start gap-2">
-          <span class="font-mono font-bold ${cleared && !prompted ? 'text-emerald-400' : cleared ? 'text-amber-400' : 'text-rose-400'} mt-0.5">${cleared && !prompted ? '✓' : '!'}</span>
-          <div class="space-y-0.5">
-            <div class="font-medium ${cleared && !prompted ? 'text-zinc-200' : 'text-amber-300'}">${escapeHtml(formatGateTitle(g.key))} ${statusBadge}</div>
-            <div class="text-[11px] text-zinc-400 leading-snug">${escapeHtml(resp)}</div>
+        <div class="bg-[#090A10] hairline-border rounded-xl p-3 sm:p-3.5 flex items-start gap-3">
+          <span class="font-mono font-bold text-base sm:text-lg ${cleared && !prompted ? 'text-emerald-400' : cleared ? 'text-amber-400' : 'text-rose-400'} mt-0.5">${cleared && !prompted ? '✓' : '!'}</span>
+          <div class="space-y-1 flex-1">
+            <div class="text-xs sm:text-sm font-bold ${cleared && !prompted ? 'text-zinc-100' : 'text-amber-300'} flex items-center justify-between flex-wrap gap-1">
+              <span>${escapeHtml(formatGateTitle(g.key))}</span>
+              ${statusBadge}
+            </div>
+            <div class="text-xs sm:text-sm text-zinc-300 leading-relaxed">${escapeHtml(resp)}</div>
           </div>
         </div>
       `;
@@ -1943,14 +1946,14 @@ function renderFinalScorecard(dxText, planText) {
       const resp = g.response_text || g.response || "";
       const note = g.examiner_note ? ` [Exam: ${g.examiner_note}]` : "";
       return `
-        <div class="bg-[#090A10] hairline-border rounded-lg p-2.5 flex items-start gap-2">
-          <span class="font-mono font-bold ${unlocked ? 'text-emerald-400' : 'text-zinc-500'} mt-0.5">${unlocked ? '✓' : '•'}</span>
-          <div class="space-y-0.5 min-w-0">
-            <div class="font-medium ${unlocked ? 'text-zinc-200' : 'text-zinc-500'}">
-              ${escapeHtml(formatGateTitle(g.key))}
-              <span class="text-[10px] font-mono ${unlocked ? 'text-emerald-400' : 'text-zinc-500'}">(${unlocked ? 'Unlocked' : 'Missed'})</span>
+        <div class="bg-[#090A10] hairline-border rounded-xl p-3 sm:p-3.5 flex items-start gap-3">
+          <span class="font-mono font-bold text-base sm:text-lg ${unlocked ? 'text-emerald-400' : 'text-zinc-500'} mt-0.5">${unlocked ? '✓' : '•'}</span>
+          <div class="space-y-1 min-w-0 flex-1">
+            <div class="text-xs sm:text-sm font-bold ${unlocked ? 'text-zinc-100' : 'text-zinc-400'} flex items-center justify-between flex-wrap gap-1">
+              <span>${escapeHtml(formatGateTitle(g.key))}</span>
+              <span class="text-xs font-mono font-semibold ${unlocked ? 'text-emerald-400' : 'text-zinc-500'}">(${unlocked ? 'Unlocked' : 'Missed'})</span>
             </div>
-            <div class="text-[11px] ${unlocked ? 'text-zinc-300' : 'text-zinc-500'} leading-snug truncate sm:whitespace-normal">${escapeHtml(resp + note)}</div>
+            <div class="text-xs sm:text-sm ${unlocked ? 'text-zinc-200' : 'text-zinc-400'} leading-relaxed">${escapeHtml(resp + note)}</div>
           </div>
         </div>
       `;
@@ -1964,9 +1967,9 @@ function renderFinalScorecard(dxText, planText) {
     if (traps.length > 0) {
       trapsSec.classList.remove("hidden");
       trapsContainer.innerHTML = traps.map(t => `
-        <div class="bg-[#090A10] hairline-border rounded-lg p-3 space-y-1">
-          <div class="font-medium text-amber-300">⚠️ ${escapeHtml(t.name)}</div>
-          <div class="text-zinc-400">${escapeHtml(t.remediation)}</div>
+        <div class="bg-[#090A10] hairline-border rounded-xl p-3.5 space-y-1.5">
+          <div class="text-xs sm:text-sm font-bold text-amber-300">⚠️ ${escapeHtml(t.name)}</div>
+          <div class="text-xs sm:text-sm text-zinc-300 leading-relaxed">${escapeHtml(t.remediation)}</div>
         </div>
       `).join("");
     } else {
@@ -1986,15 +1989,15 @@ function renderFinalScorecard(dxText, planText) {
 
   const diffsHtml = (activeCase.differentials || []).map(d => {
     const feats = (d.supporting_features || []).join("; ");
-    return `<li><strong class="text-zinc-200">${escapeHtml(d.name)}</strong>${feats ? ` — <span class="text-zinc-400">${escapeHtml(feats)}</span>` : ""}</li>`;
+    return `<li><strong class="text-white">${escapeHtml(d.name)}</strong>${feats ? ` — <span class="text-zinc-300">${escapeHtml(feats)}</span>` : ""}</li>`;
   }).join("");
 
   const vivaHtml = questions.map((q, i) => {
-    const pts = (q.key_points_required || q.key_points || []).map(p => `<li class="ml-4 list-disc text-zinc-300">${escapeHtml(p)}</li>`).join("");
+    const pts = (q.key_points_required || q.key_points || []).map(p => `<li class="ml-4 list-disc text-zinc-200">${escapeHtml(p)}</li>`).join("");
     return `
       <div class="space-y-1">
-        <div class="font-medium text-zinc-200">Q${i + 1}: ${escapeHtml(q.prompt || q.question || "")}</div>
-        <ul class="space-y-0.5">${pts}</ul>
+        <div class="font-bold text-zinc-100 text-xs sm:text-sm">Q${i + 1}: ${escapeHtml(q.prompt || q.question || "")}</div>
+        <ul class="space-y-1 leading-relaxed">${pts}</ul>
       </div>
     `;
   }).join("");
@@ -2002,25 +2005,25 @@ function renderFinalScorecard(dxText, planText) {
   const sheetEl = document.getElementById("card-approach-sheet");
   if (sheetEl) {
     sheetEl.innerHTML = `
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-        <div class="bg-[#090A10] hairline-border rounded-lg p-3.5 space-y-1">
-          <div class="text-[10px] font-mono uppercase tracking-wider text-emerald-400">Textbook Approach Framework</div>
-          <p class="text-zinc-300">${escapeHtml(caseRef.framework || libEntry.framework || "")}</p>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+        <div class="bg-[#090A10] hairline-border rounded-xl p-4 space-y-1.5">
+          <div class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">Textbook Approach Framework</div>
+          <p class="text-xs sm:text-sm text-zinc-200 leading-relaxed">${escapeHtml(caseRef.framework || libEntry.framework || "")}</p>
         </div>
-        <div class="bg-[#090A10] hairline-border rounded-lg p-3.5 space-y-1">
-          <div class="text-[10px] font-mono uppercase tracking-wider text-amber-400">Key Diagnostic Rationale</div>
-          <p class="text-zinc-300">${escapeHtml(activeCase.perturbation?.expert_rationale || caseRef.key_features || libEntry.etiology || "")}</p>
+        <div class="bg-[#090A10] hairline-border rounded-xl p-4 space-y-1.5">
+          <div class="text-xs font-mono uppercase tracking-wider text-amber-400 font-bold">Key Diagnostic Rationale</div>
+          <p class="text-xs sm:text-sm text-zinc-200 leading-relaxed">${escapeHtml(activeCase.perturbation?.expert_rationale || caseRef.key_features || libEntry.etiology || "")}</p>
         </div>
       </div>
 
-      <div class="bg-[#090A10] hairline-border rounded-lg p-3.5 space-y-1.5">
-        <div class="text-[10px] font-mono uppercase tracking-wider text-zinc-400">Top Differentials &amp; Discriminating Features</div>
-        <ul class="space-y-1 list-disc list-inside text-zinc-300">${diffsHtml}</ul>
+      <div class="bg-[#090A10] hairline-border rounded-xl p-4 space-y-2">
+        <div class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">Top Differentials &amp; Discriminating Features</div>
+        <ul class="space-y-1.5 list-disc list-inside text-xs sm:text-sm text-zinc-200">${diffsHtml}</ul>
       </div>
 
-      <div class="bg-[#090A10] hairline-border rounded-lg p-3.5 space-y-2.5">
-        <div class="text-[10px] font-mono uppercase tracking-wider text-zinc-400">Gold-Standard Investigations &amp; Management Key</div>
-        ${vivaHtml}
+      <div class="bg-[#090A10] hairline-border rounded-xl p-4 space-y-3">
+        <div class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">Gold-Standard Investigations &amp; Management Key</div>
+        <div class="space-y-2.5 text-xs sm:text-sm">${vivaHtml}</div>
       </div>
     `;
   }

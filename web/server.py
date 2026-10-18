@@ -477,3 +477,12 @@ def serve_index():
     p = _resolve_static_file("index.html")
     return p.read_text(encoding="utf-8")
 
+
+# Mirror all /api routes without /api prefix and with /api/index.py for Vercel serverless compatibility
+for route in list(app.routes):
+    if hasattr(route, "path") and route.path.startswith("/api/"):
+        unprefixed = route.path[len("/api"):]
+        if hasattr(route, "endpoint") and hasattr(route, "methods"):
+            app.add_api_route(unprefixed, route.endpoint, methods=route.methods, include_in_schema=False)
+            app.add_api_route("/api/index.py" + unprefixed, route.endpoint, methods=route.methods, include_in_schema=False)
+

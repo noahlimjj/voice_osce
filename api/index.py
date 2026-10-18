@@ -42,7 +42,10 @@ class VercelPathNormalizerASGI:
                 await send({"type": "http.response.body", "body": body})
                 return
 
-            if p.startswith("/api/index.py"):
+            matched = headers_dict.get(b"x-matched-path", b"").decode("latin1", "ignore")
+            if matched and matched.startswith("/api"):
+                scope["path"] = matched
+            elif p.startswith("/api/index.py"):
                 rest = p[len("/api/index.py"):]
                 scope["path"] = f"/api{rest}" if not rest.startswith("/api") else rest
             elif not p.startswith("/api") and p != "/":

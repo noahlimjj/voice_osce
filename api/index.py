@@ -12,27 +12,25 @@ if str(_REPO_ROOT) not in sys.path:
 if str(_REPO_ROOT.parent) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT.parent))
 
-from starlette.requests import Request
-from starlette.middleware.base import BaseHTTPMiddleware
-from web.server import app
+from web.server import app as _fastapi_app
 
 
-class VercelPathNormalizerMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        path = request.scope.get("path", "")
-        if path.startswith("/api/index.py"):
-            rest = path[len("/api/index.py"):]
-            if not rest or rest == "/":
-                request.scope["path"] = "/api/health"
-            else:
-                request.scope["path"] = f"/api{rest}" if not rest.startswith("/api") else rest
-        elif not path.startswith("/api") and path != "/":
-            request.scope["path"] = f"/api{path}"
+class VercelPathNormalizerASGI:
+    """Pure ASGI middleware that normalizes scope['path'] BEFORE FastAPI routing."""
+    def __init__(self, app):
+        self.app = app
 
-        response = await call_next(request)
-        return response
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            p = scope.get("path", "")
+            if p.startswith("/api/index.py"):
+                rest = p[len("/api/index.py"):]
+                scope["path"] = f"/api{rest}" if not rest.startswith("/api") else rest
+            elif not p.startswith("/api") and p != "/":
+                scope["path"] = f"/api{p}"
+        await self.app(scope, receive, send)
 
 
-app.add_middleware(VercelPathNormalizerMiddleware)
+app = VercelPathNormalizerASGI(_fastapi_app)
 
 __all__ = ["app"]

@@ -137,6 +137,32 @@ const SYMPTOM_APPROACH_LIBRARY = {
       "Painful ophthalmoplegia, proptosis, RAPD, and color vision loss after sinusitis (Orbital Cellulitis — sight/cavernous sinus thrombosis risk)"
     ],
     investigations: "Visual Acuity (Snellen) + Pupil RAPD + Slit-lamp & Tonometry (IOP) • Flexible Nasoendoscopy + Biopsy of Fossa of Rosenmüller • Contrast MRI Nasopharynx/Skull Base or CT Orbits/Sinuses + Plasma EBV DNA."
+  },
+  geriatrics: {
+    label: "Geriatrics",
+    source: "British Geriatrics Society (BGS) / Comprehensive Geriatric Assessment (CGA)",
+    framework: "Multifactorial Fall & Confusion Assessment (The 4 'I's: Immobility, Instability, Incontinence, Intellectual Impairment) + Medication Review (STOPP/START, sedative/antihypertensive burden) + Lying & Standing Orthostatic Hemodynamics + Delirium 4AT screen.",
+    etiology: "Mechanical / Extrinsic (trip hazards, bifocals) • Cardiovascular (Orthostatic Hypotension, Carotid Sinus Hypersensitivity, Vasovagal, Arrhythmia, Severe AS) • Neurological (Parkinson's, Normal Pressure Hydrocephalus, Sensory Ataxia) • Acute Medical / Delirium Precipitant (Infection/UTI/Pneumonia, Dehydration/AKI, Polypharmacy).",
+    red_flags: [
+      "Head strike on antiplatelet or anticoagulant with post-fall confusion (Subdural / Intracranial Hemorrhage — urgent Non-Contrast CT Brain)",
+      "Shortened, externally rotated lower limb with severe groin pain (Neck of Femur / Hip Fracture — AP Pelvis radiograph)",
+      "Symptomatic postural drop: SBP fall >=20 mmHg or DBP fall >=10 mmHg within 3 mins standing (Orthostatic Hypotension)",
+      "Acute fluctuating inattention, altered conscious level, and perceptual disturbances (Acute Delirium — identify and treat underlying trigger)"
+    ],
+    investigations: "Lying & Standing Blood Pressure (at 1 and 3 mins) • 12-Lead ECG • FBC, U&E, Calcium, Serum Glucose, CRP • Urine Dipstick & Microscopic Culture • Targeted Radiographs (Pelvis/Hip, Chest) • Non-Contrast CT Brain if head injury or anticoagulated."
+  },
+  communication: {
+    label: "Communication",
+    source: "SPIKES Protocol for Breaking Bad News (Baile & Buckman) / Singapore SMC Ethical Guidelines",
+    framework: "SPIKES Protocol (Setting up interview, Perception of patient, Invitation/extent of information desired, Knowledge & medical facts, Emotions & empathetic responses, Strategy & Summary) + Mental Capacity Act (MCA) 4-Domain Assessment + Advance Care Planning (ACP).",
+    etiology: "Malignancy / Unfavorable Biopsy Disclosure • Medical Error / Complication Disclosure • Conflict Resolution & Emotionally Distressed Relative • Resuscitation Goals & DNACPR Discussions • Capacity Assessment for High-Stakes Treatment.",
+    red_flags: [
+      "Disclosing severe diagnosis bluntly without assessing baseline understanding or firing a warning shot (Psychological shock / trauma)",
+      "Colluding with relatives to conceal diagnosis from a competent adult patient without patient's express consent",
+      "Overlooking emotional cues by immediately jumping into complex technical oncological details",
+      "Failing to document discussion, family presence, information given, and agreed resuscitation goals in case notes"
+    ],
+    investigations: "Quiet private room with seating and tissues • Arrange Clinical Nurse Specialist / Medical Social Worker presence • Provide written diagnosis leaflet & dedicated contact number • Early Palliative / Supportive Care referral • Formal documentation of discussion and ACP preferences."
   }
 };
 
@@ -363,10 +389,26 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // Hotkey support: '/' focuses search, 'Escape' dismisses overlays, 'Ctrl+Enter' grades station
+  const dxInput = document.getElementById("dx-input");
+  if (dxInput) {
+    dxInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        document.getElementById("viva-answer-input")?.focus();
+      }
+    });
+  }
+
+  // Hotkey support: Speed-run shortcuts for rapid navigation
   document.addEventListener("keydown", (e) => {
     const activeEl = document.activeElement;
     const isInputActive = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable);
+    const consultView = document.getElementById("consultation-view");
+    const isConsultActive = consultView && !consultView.classList.contains("hidden");
+    const vivaView = document.getElementById("viva-view");
+    const isVivaActive = vivaView && !vivaView.classList.contains("hidden");
+    const scoreView = document.getElementById("scorecard-view");
+    const isScoreActive = scoreView && !scoreView.classList.contains("hidden");
 
     if (e.key === "/" && !isInputActive) {
       const casesView = document.getElementById("cases-view");
@@ -380,12 +422,29 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("time-guide-popover")?.classList.add("hidden");
       document.getElementById("symptom-approach-drawer")?.classList.add("hidden");
       if (activeEl && activeEl.id === "station-search-input") activeEl.blur();
+    } else if (e.altKey && isConsultActive) {
+      if (e.key === "1") { e.preventDefault(); fireSpamMacro("socrates"); }
+      else if (e.key === "2") { e.preventDefault(); fireSpamMacro("red_flags"); }
+      else if (e.key === "3") { e.preventDefault(); fireSpamMacro("pmhx_meds"); }
+      else if (e.key === "4") { e.preventDefault(); fireSpamMacro("social_epi"); }
+      else if (e.key === "5") { e.preventDefault(); fireSpamMacro("exam_vitals"); }
+      else if (e.key === "s" || e.key === "S") { e.preventDefault(); fireSpamMacro("all_clinical"); }
+      else if (e.key === "t" || e.key === "T") { e.preventDefault(); triggerInlineTwistBanner(); }
+      else if (e.key === "c" || e.key === "C") { e.preventDefault(); toggleRevealMissedClues(); }
+      else if (e.key === "m" || e.key === "M") { e.preventDefault(); toggleMicrophoneRecord(); }
+      else if (e.key === "Enter") { e.preventDefault(); openDiagnosisAndVivaStep(); }
     } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      const vivaView = document.getElementById("viva-view");
-      if (vivaView && !vivaView.classList.contains("hidden")) {
+      if (isVivaActive) {
         e.preventDefault();
         gradeStationNow();
+      } else if (isConsultActive) {
+        e.preventDefault();
+        openDiagnosisAndVivaStep();
       }
+    } else if (isScoreActive && e.altKey) {
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); retryCurrentStation(); }
+      else if (e.key === "n" || e.key === "N") { e.preventDefault(); startRandomCase(); }
+      else if (e.key === "l" || e.key === "L") { e.preventDefault(); exitStationToLibrary(); }
     }
   });
 });
@@ -611,7 +670,9 @@ async function loadCases() {
       complaint: c.brief?.presenting_complaint || c.presenting_complaint || c.chief_complaint || "",
       compactVitals: formatCompactVitals(c.brief?.triage_vitals || c.triage_vitals),
       isSgClassic: isSg,
-      targetSeconds: targetSec
+      targetSeconds: targetSec,
+      difficulty: c.difficulty || (targetSec <= 60 ? "Easy" : targetSec >= 120 ? "Hard" : "Intermediate"),
+      hasPerturbation: Boolean(c.has_perturbation !== false && c.perturbation)
     };
   });
 
@@ -675,16 +736,31 @@ function renderProgressSummary() {
   const avg = Math.round(done.reduce((acc, c) => acc + progress[c.id].best, 0) / done.length);
   const weak = done.filter(c => progress[c.id].best < 65).length;
   const pct = Math.round((done.length / Math.max(1, currentCases.length)) * 100);
+  const isFilteringWeak = activeFilterCategory === "to_revisit";
+  const isFilteringUnattempted = activeFilterCategory === "unattempted";
+
   el.innerHTML = `
     <div class="flex items-center gap-2.5 min-w-0">
       <div class="w-24 sm:w-32 h-1.5 rounded-full bg-white/5 overflow-hidden shrink-0" role="progressbar" aria-label="Stations attempted" aria-valuenow="${pct}" aria-valuemin="0" aria-valuemax="100">
         <div class="h-full bg-emerald-400/80" style="width:${pct}%"></div>
       </div>
-      <span class="text-zinc-300"><span class="font-mono text-zinc-100">${done.length}</span><span class="text-zinc-500">/${currentCases.length}</span> attempted</span>
+      <button onclick="filterCases('${isFilteringUnattempted ? 'all' : 'unattempted'}')" class="text-zinc-300 hover:text-white transition text-left cursor-pointer" title="Click to filter unattempted stations">
+        <span class="font-mono text-zinc-100">${done.length}</span><span class="text-zinc-500">/${currentCases.length}</span> attempted
+        ${isFilteringUnattempted ? '<span class="text-emerald-400 font-mono text-[10px] ml-1">[Viewing unattempted]</span>' : ''}
+      </button>
     </div>
     <span class="text-zinc-600">·</span>
     <span class="text-zinc-400">Avg best <span class="font-mono text-zinc-100">${avg}%</span></span>
-    ${weak > 0 ? `<span class="text-zinc-600">·</span><span class="text-amber-300/90">${weak} to revisit</span>` : ""}
+    ${weak > 0 ? `
+      <span class="text-zinc-600">·</span>
+      <button onclick="filterCases('${isFilteringWeak ? 'all' : 'to_revisit'}')" class="text-amber-300/90 hover:underline cursor-pointer font-medium" title="Click to filter stations scoring under 65%">
+        ${weak} to revisit ${isFilteringWeak ? '<span class="text-amber-400 font-mono text-[10px]">[Active]</span>' : ''}
+      </button>
+    ` : ""}
+    ${(isFilteringWeak || isFilteringUnattempted) ? `
+      <span class="text-zinc-600">·</span>
+      <button onclick="filterCases('all')" class="text-zinc-400 hover:text-zinc-200 underline font-mono text-[10px] cursor-pointer">Clear filter</button>
+    ` : ""}
   `;
 }
 
@@ -704,7 +780,11 @@ function updateFilterTabCounts() {
       obgyn: "OBGYN",
       pediatrics: "Pediatrics",
       psych: "Psych",
-      ent_eye: "ENT & Eye"
+      ent_eye: "ENT & Eye",
+      geriatrics: "Geriatrics",
+      communication: "Communication",
+      to_revisit: "To Revisit",
+      unattempted: "Unattempted"
     };
     const label = baseLabels[cat] || cat;
     const badge = cat === "sg_classics" ? `<span class="sg-badge">SG</span> ` : "";
@@ -715,6 +795,14 @@ function updateFilterTabCounts() {
 function isCaseMatchingFilter(c, filterKey) {
   if (!filterKey || filterKey === "all") return true;
   if (filterKey === "sg_classics") return c.isSgClassic;
+  if (filterKey === "to_revisit") {
+    const progress = loadProgress();
+    return Boolean(progress[c.id] && progress[c.id].best < 65);
+  }
+  if (filterKey === "unattempted") {
+    const progress = loadProgress();
+    return !progress[c.id];
+  }
   return c.cluster === filterKey;
 }
 
@@ -723,13 +811,16 @@ function getFilteredCases() {
     if (!isCaseMatchingFilter(c, activeFilterCategory)) return false;
     if (!currentSearchQuery) return true;
     const q = currentSearchQuery.toLowerCase();
+    const raw = ALL_CASES_MAP[c.id] || {};
+    const extra = `${raw.chief_complaint || ""} ${raw.background_context || ""} ${raw.setting || ""}`.toLowerCase();
     return (
       c.blindPrompt.toLowerCase().includes(q) ||
       c.title.toLowerCase().includes(q) ||
       c.specialty.toLowerCase().includes(q) ||
       c.clusterLabel.toLowerCase().includes(q) ||
       c.complaint.toLowerCase().includes(q) ||
-      c.id.toLowerCase().includes(q)
+      c.id.toLowerCase().includes(q) ||
+      extra.includes(q)
     );
   });
 }
@@ -795,7 +886,7 @@ function renderCasesGrid(cases) {
         <div class="text-2xl opacity-60">🔍</div>
         <p class="text-sm text-zinc-300">No stations match ${q}</p>
         <p class="text-xs text-zinc-500">Try a symptom (“chest pain”), an organ (“liver”) or a specialty.</p>
-        <button onclick="filterCases('all'); document.getElementById('station-search-input').value=''; handleStationSearch('');" class="mt-2 px-3 py-1.5 rounded-lg card-surface hover:border-zinc-600 text-xs text-emerald-400 font-medium transition">Clear search &amp; filters</button>
+        <button onclick="filterCases('all'); document.getElementById('station-search-input').value=''; handleStationSearch('');" class="mt-2 px-3 py-1.5 rounded-lg card-surface hover:border-zinc-600 text-xs text-emerald-400 font-medium transition cursor-pointer">Clear search &amp; filters</button>
       </div>
     `;
     return;
@@ -817,6 +908,12 @@ function renderCasesGrid(cases) {
       ? `<span class="text-[11px] font-medium text-zinc-300"><span class="sg-badge">SG</span> ${escapeHtml(c.clusterLabel)}</span>`
       : `<span class="text-[11px] font-medium text-zinc-400">${escapeHtml(c.shortSpecialty)} • ${escapeHtml(c.clusterLabel)}</span>`;
 
+    const diffBadge = c.difficulty === "Easy"
+      ? `<span class="font-mono text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0.5 rounded">Easy • ${c.targetSeconds}s</span>`
+      : c.difficulty === "Hard"
+      ? `<span class="font-mono text-[10px] text-rose-300 bg-rose-500/10 border border-rose-500/25 px-1.5 py-0.5 rounded">Hard • ${c.targetSeconds}s</span>`
+      : `<span class="font-mono text-[10px] text-amber-300 bg-amber-500/10 border border-amber-500/25 px-1.5 py-0.5 rounded">Int • ${c.targetSeconds}s</span>`;
+
     const displayTitle = isBlindMode ? c.blindPrompt : c.title;
     const subtitleHtml = isBlindMode
       ? `<p class="text-[11px] text-zinc-500 mt-1 truncate">${escapeHtml(c.setting)}</p>`
@@ -824,12 +921,10 @@ function renderCasesGrid(cases) {
 
     card.innerHTML = `
       <div class="space-y-2.5">
-        <!-- 1. Top Row: Specialty/Symptom Tag + Target Time Pill -->
+        <!-- 1. Top Row: Specialty/Symptom Tag + Target Time & Difficulty Pill -->
         <div class="flex items-center justify-between gap-2">
           ${topTag}
-          <span class="font-mono text-[11px] text-zinc-400 bg-[#090A10] hairline-border px-2 py-0.5 rounded">
-            ${escapeHtml(formatTargetBadge(c.targetSeconds))}
-          </span>
+          ${diffBadge}
         </div>
 
         <!-- 2. Center Title: Unspoiled Presenting Complaint (or Diagnosis if Blind Mode off) -->
@@ -1427,11 +1522,25 @@ function toggleVoiceOutputMode() {
 function speakPatientText(text) {
   if (!text || !isVoiceOutputEnabled) return;
   if (window.speechSynthesis) {
-    window.speechSynthesis.cancel();
-    const utter = new SpeechSynthesisUtterance(text);
-    utter.rate = 1.4;
-    utter.lang = "en-SG";
-    window.speechSynthesis.speak(utter);
+    try {
+      window.speechSynthesis.cancel();
+      if (window.speechSynthesis.resume) window.speechSynthesis.resume();
+      const utter = new SpeechSynthesisUtterance(text);
+      utter.rate = 1.35;
+      utter.lang = "en-SG";
+
+      // Select natural voice matching patient gender if available
+      const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
+      const gender = String(activeCase?.brief?.gender || activeCase?.gender || "").toLowerCase();
+      const isFemale = gender.startsWith("f");
+      let match = voices.find(v => v.lang === "en-SG" && (isFemale ? /female|zira|samantha|karen/i.test(v.name) : /male|david|george/i.test(v.name)));
+      if (!match) match = voices.find(v => v.lang === "en-SG");
+      if (!match) match = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en-AU"));
+      if (!match) match = voices.find(v => v.lang.startsWith("en"));
+      if (match) utter.voice = match;
+
+      window.speechSynthesis.speak(utter);
+    } catch (_) {}
   }
 }
 
@@ -1453,6 +1562,7 @@ function startVoiceRecognition() {
     speechRecognizer = new SR();
     speechRecognizer.continuous = true;
     speechRecognizer.interimResults = true;
+    speechRecognizer.maxAlternatives = 1;
     speechRecognizer.lang = "en-SG";
     isRecording = true;
     updateMicUI(true);
@@ -1466,13 +1576,24 @@ function startVoiceRecognition() {
         else interim += t;
       }
       const input = document.getElementById("candidate-text-input");
-      if (input) input.value = (finalTranscript || interim).trim();
+      if (input && (finalTranscript || interim)) {
+        input.value = (finalTranscript || interim).trim();
+      }
       if (finalTranscript.trim()) {
-        if (input) input.value = finalTranscript.trim();
         sendCandidateMessage();
       }
     };
-    speechRecognizer.onerror = () => stopVoiceRecognition();
+    speechRecognizer.onerror = (e) => {
+      // Graceful fallback if device lacks en-SG voice pack
+      if (e.error === "language-not-supported" && speechRecognizer) {
+        try {
+          speechRecognizer.lang = navigator.language || "en-US";
+          speechRecognizer.start();
+          return;
+        } catch (_) {}
+      }
+      stopVoiceRecognition();
+    };
     speechRecognizer.onend = () => { if (isRecording) stopVoiceRecognition(); };
     speechRecognizer.start();
   } catch (_) {
@@ -1494,10 +1615,10 @@ function updateMicUI(active) {
   const icon = document.getElementById("mic-icon");
   if (!btn || !icon) return;
   if (active) {
-    btn.className = "w-9 h-9 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-400 mic-listening flex items-center justify-center shrink-0 transition";
+    btn.className = "w-10 h-10 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-400 mic-active flex items-center justify-center shrink-0 transition";
     icon.className = "fa-solid fa-stop text-xs";
   } else {
-    btn.className = "w-9 h-9 rounded-lg bg-[#090A10] hairline-border hover:border-zinc-700 text-zinc-400 hover:text-zinc-100 flex items-center justify-center shrink-0 transition";
+    btn.className = "w-10 h-10 rounded-lg bg-[#090A10] hairline-border hover:border-zinc-700 text-zinc-400 hover:text-zinc-100 flex items-center justify-center shrink-0 transition";
     icon.className = "fa-solid fa-microphone text-xs";
   }
 }
@@ -1514,19 +1635,33 @@ function openDiagnosisAndVivaStep() {
   if (dxInput) dxInput.value = "";
   if (vivaInput) vivaInput.value = "";
 
-  // Populate Quick-Tap Diagnosis Suggestion Chips (Case differentials + unspoiled options)
+  // Populate Quick-Tap Diagnosis Suggestion Chips (Shuffled with distractors to challenge candidate)
   const chipsEl = document.getElementById("dx-suggestion-chips");
   if (chipsEl) {
     const diffs = (activeCase.differentials || []).map(d => d.name.split("(")[0].trim());
     const pertHyps = Object.keys(activeCase.perturbation?.expected_shifts || {}).map(h => h.split("(")[0].trim());
-    const fallbackDistractors = ["Acute Sepsis", "Pulmonary Embolism", "Acute Coronary Syndrome", "Viral Syndrome"];
-    const uniqueChips = Array.from(new Set([...diffs, ...pertHyps, ...fallbackDistractors])).slice(0, 5);
+    const fallbackDistractors = [
+      "Acute Sepsis / Severe Infection",
+      "Pulmonary Embolism",
+      "Acute Coronary Syndrome",
+      "Viral Exanthem",
+      "Community-Acquired Pneumonia",
+      "Acute Abdomen of Unknown Origin"
+    ];
+    const uniqueChips = Array.from(new Set([...diffs, ...pertHyps, ...fallbackDistractors])).slice(0, 6);
+    // Pseudo-shuffle so the primary diagnosis is not always first
+    const seed = (activeCase.id || "osce").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    const shuffled = uniqueChips.sort((a, b) => {
+      const hA = (a.length * seed) % 19;
+      const hB = (b.length * seed) % 19;
+      return hA - hB;
+    });
 
-    chipsEl.innerHTML = uniqueChips.map(chip => `
+    chipsEl.innerHTML = shuffled.map(chip => `
       <button
         type="button"
         onclick="appendDiagnosisChip('${escapeHtml(chip)}')"
-        class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-[11px] text-zinc-300 transition"
+        class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-500 hover:text-white text-[11px] text-zinc-300 transition"
       >
         + ${escapeHtml(chip)}
       </button>
@@ -1796,6 +1931,32 @@ function renderFinalScorecard(dxText, planText) {
     }).join("");
   }
 
+  // 3b. Clinical History & Bedside Findings Audit
+  const cluesCounterEl = document.getElementById("card-clues-counter");
+  if (cluesCounterEl) {
+    cluesCounterEl.innerText = `${ctUnlocked}/${clinicalTriggerGates.length} Cleared (${ctScore}/20 pts)`;
+  }
+  const cluesListEl = document.getElementById("card-clues-list");
+  if (cluesListEl) {
+    cluesListEl.innerHTML = clinicalTriggerGates.map(g => {
+      const unlocked = clientSession.unlockedGateKeys.has(g.key);
+      const resp = g.response_text || g.response || "";
+      const note = g.examiner_note ? ` [Exam: ${g.examiner_note}]` : "";
+      return `
+        <div class="bg-[#090A10] hairline-border rounded-lg p-2.5 flex items-start gap-2">
+          <span class="font-mono font-bold ${unlocked ? 'text-emerald-400' : 'text-zinc-500'} mt-0.5">${unlocked ? '✓' : '•'}</span>
+          <div class="space-y-0.5 min-w-0">
+            <div class="font-medium ${unlocked ? 'text-zinc-200' : 'text-zinc-500'}">
+              ${escapeHtml(formatGateTitle(g.key))}
+              <span class="text-[10px] font-mono ${unlocked ? 'text-emerald-400' : 'text-zinc-500'}">(${unlocked ? 'Unlocked' : 'Missed'})</span>
+            </div>
+            <div class="text-[11px] ${unlocked ? 'text-zinc-300' : 'text-zinc-500'} leading-snug truncate sm:whitespace-normal">${escapeHtml(resp + note)}</div>
+          </div>
+        </div>
+      `;
+    }).join("");
+  }
+
   // 4. Cognitive Traps
   const trapsSec = document.getElementById("card-traps-section");
   const trapsContainer = document.getElementById("card-traps-container");
@@ -1864,17 +2025,44 @@ function renderFinalScorecard(dxText, planText) {
     `;
   }
 
+  const rfReport = redFlagGates.map(g => {
+    const cleared = clientSession.unlockedGateKeys.has(g.key);
+    const prompted = cleared && assistedKeys.has(g.key);
+    const tag = cleared && !prompted ? "✓ Cleared" : prompted ? "[Assisted - 0 pts]" : "✗ Missed";
+    return `- ${tag}: ${formatGateTitle(g.key)}`;
+  }).join("\n");
+
+  const diffsReport = (activeCase.differentials || []).map(d => {
+    const feats = (d.supporting_features || []).join("; ");
+    return `- **${d.name}**: ${feats || "Key clinical features"}`;
+  }).join("\n");
+
   latestMarkdownReport = [
     `# OSCEBlitz Study Card — ${activeCase.title}`,
-    `**Score:** ${totalScore}% (${grade}) | **Time:** ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)}`,
+    `**Score:** ${totalScore}% (${grade}) | **Time:** ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)} target`,
+    `**Pillars:** Red Flags: ${rfScore}/40 | History: ${ctScore}/20 | Dx & Twist: ${pivotScore}/25 | Management: ${vivaScore}/15`,
     `**Primary Diagnosis:** ${primaryDiff}`,
     ``,
-    `## Key Diagnostic Rationale`,
-    activeCase.perturbation?.expert_rationale || "",
+    `## Red Flags Safety Audit`,
+    rfReport,
+    ``,
+    `## Key Diagnostic Rationale & Bedside Twist`,
+    activeCase.perturbation?.expert_rationale || caseRef.framework || "",
+    ``,
+    `## Top Differentials & Discriminating Features`,
+    diffsReport,
     ``,
     `## Gold-Standard Management Key`,
     ...questions.flatMap(q => (q.key_points_required || q.key_points || []).map(p => `- ${p}`))
   ].join("\n");
+}
+
+function retryCurrentStation() {
+  if (!activeCase) {
+    startRandomCase();
+    return;
+  }
+  launchInstantBlitz(activeCase.id);
 }
 
 function copyMarkdownReport() {

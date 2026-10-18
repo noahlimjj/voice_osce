@@ -474,25 +474,25 @@
         <!-- 5 Clean 1-Tap Sweep Macros -->
         <div class="flex items-center justify-between gap-1.5 flex-wrap pt-0.5">
           <div class="flex flex-wrap items-center gap-1.5">
-            <button onclick="fireSpamMacro('socrates')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
-              ⚡ SOCRATES
+            <button onclick="fireSpamMacro('socrates')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition" title="Shortcut: Alt+1">
+              ⚡ SOCRATES <span class="hidden md:inline font-mono text-[9px] text-zinc-500 ml-1">Alt 1</span>
             </button>
-            <button onclick="fireSpamMacro('red_flags')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-rose-500/50 text-rose-300 text-[11px] font-medium transition">
-              🚨 Red Flags
+            <button onclick="fireSpamMacro('red_flags')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-rose-500/50 text-rose-300 text-[11px] font-medium transition" title="Shortcut: Alt+2">
+              🚨 Red Flags <span class="hidden md:inline font-mono text-[9px] text-rose-400/60 ml-1">Alt 2</span>
             </button>
-            <button onclick="fireSpamMacro('pmhx_meds')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
-              💊 PMHx &amp; Meds
+            <button onclick="fireSpamMacro('pmhx_meds')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition" title="Shortcut: Alt+3">
+              💊 PMHx &amp; Meds <span class="hidden md:inline font-mono text-[9px] text-zinc-500 ml-1">Alt 3</span>
             </button>
-            <button onclick="fireSpamMacro('social_epi')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
-              🌏 Social &amp; Epi
+            <button onclick="fireSpamMacro('social_epi')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition" title="Shortcut: Alt+4">
+              🌏 Social &amp; Epi <span class="hidden md:inline font-mono text-[9px] text-zinc-500 ml-1">Alt 4</span>
             </button>
-            <button onclick="fireSpamMacro('exam_vitals')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition">
-              🩺 Exam &amp; Vitals
+            <button onclick="fireSpamMacro('exam_vitals')" class="px-2.5 py-1 rounded-md bg-[#090A10] hairline-border hover:border-zinc-600 text-zinc-300 text-[11px] font-medium transition" title="Shortcut: Alt+5">
+              🩺 Exam &amp; Vitals <span class="hidden md:inline font-mono text-[9px] text-zinc-500 ml-1">Alt 5</span>
             </button>
           </div>
 
-          <button onclick="fireSpamMacro('all_clinical')" class="text-[11px] text-zinc-500 hover:text-zinc-300 font-mono transition">
-            Sweep All →
+          <button onclick="fireSpamMacro('all_clinical')" class="text-[11px] text-zinc-500 hover:text-zinc-300 font-mono transition" title="Shortcut: Alt+S">
+            Sweep All <span class="hidden md:inline font-mono text-[9px] text-zinc-600 ml-1">Alt S</span> →
           </button>
         </div>
       </div>
@@ -678,6 +678,17 @@
           </div>
         </div>
 
+        <!-- History & Bedside Findings Audit -->
+        <div class="space-y-2 pt-2 hairline-border-t">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-zinc-400">History &amp; Bedside Findings Audit</h3>
+            <span id="card-clues-counter" class="text-[11px] font-mono text-zinc-400">0/0 Cleared</span>
+          </div>
+          <div id="card-clues-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
         <!-- Cognitive Traps Section (if any triggered) -->
         <div id="card-traps-section" class="hidden space-y-2 pt-2 hairline-border-t">
           <h3 class="text-xs font-bold uppercase tracking-wider text-amber-400">Clinical Pitfalls</h3>
@@ -709,6 +720,10 @@
         </button>
 
         <div class="flex flex-wrap items-center gap-2">
+          <button onclick="retryCurrentStation()" class="px-3.5 py-2 rounded-lg card-surface hover:border-zinc-500 text-xs font-medium text-emerald-400 transition flex items-center gap-1.5" title="Retry this station from scratch (Alt+R)">
+            <span>🔄</span>
+            <span>Retry Station</span>
+          </button>
           <button onclick="copyMarkdownReport()" class="px-3.5 py-2 rounded-lg card-surface hover:border-zinc-600 text-xs font-medium text-zinc-300 transition">
             📋 Copy Report
           </button>

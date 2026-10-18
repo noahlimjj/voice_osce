@@ -23,29 +23,23 @@ class VercelPathNormalizerASGI:
     async def __call__(self, scope, receive, send):
         if scope.get("type") == "http":
             p = scope.get("path", "")
-            headers = dict(scope.get("headers", []))
-            
-            # If path ends with health, answer 200 immediately
-            if p.endswith("health") or b"health" in headers.get(b"x-matched-path", b""):
-                data = {
-                    "status": "ok",
-                    "scope_path": p,
-                    "x_matched_path": headers.get(b"x-matched-path", b"").decode("utf-8", "ignore"),
-                    "raw_path": scope.get("raw_path", b"").decode("utf-8", "ignore")
+            headers_list = scope.get("headers", [])
+            headers_dict = {k.lower(): v for k, v in headers_list}
+
+            if "debug" in p or b"debug" in str(headers_list).encode():
+                debug_info = {
+                    "path": p,
+                    "raw_path": scope.get("raw_path", b"").decode("latin1", "ignore"),
+                    "query_string": scope.get("query_string", b"").decode("latin1", "ignore"),
+                    "headers": {k.decode("latin1", "ignore"): v.decode("latin1", "ignore") for k, v in headers_list}
                 }
-                body = json.dumps(data).encode("utf-8")
+                body = json.dumps(debug_info, indent=2).encode("utf-8")
                 await send({
                     "type": "http.response.start",
                     "status": 200,
-                    "headers": [
-                        [b"content-type", b"application/json"],
-                        [b"content-length", str(len(body)).encode("ascii")]
-                    ]
+                    "headers": [[b"content-type", b"application/json"], [b"content-length", str(len(body)).encode("ascii")]]
                 })
-                await send({
-                    "type": "http.response.body",
-                    "body": body
-                })
+                await send({"type": "http.response.body", "body": body})
                 return
 
             if p.startswith("/api/index.py"):

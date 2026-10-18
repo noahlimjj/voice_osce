@@ -13,6 +13,21 @@
   <link rel="apple-touch-icon" href="icon-512.png">
   <link rel="manifest" href="manifest.json">
 
+  <!-- Instant Theme Detection Script (prevents flash of wrong theme) -->
+  <script>
+    (function() {
+      try {
+        const saved = localStorage.getItem("osceblitz.theme");
+        const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+        if (saved === "light" || (!saved && !prefersDark)) {
+          document.documentElement.classList.remove("dark");
+        } else {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (e) {}
+    })();
+  </script>
+
   <!-- Google Fonts: Inter & JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -42,34 +57,140 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
   <style>
+    :root {
+      --bg-main: #090A10;
+      --bg-surface: #11131B;
+      --bg-surface-hover: #161924;
+      --bg-inset: #090A10;
+      --text-main: #F1F5F9;
+      --text-muted: #94A3B8;
+      --border-color: rgba(255, 255, 255, 0.07);
+      --border-hover: rgba(255, 255, 255, 0.16);
+      --header-bg: rgba(9, 10, 16, 0.95);
+    }
+    html:not(.dark) {
+      --bg-main: #F8FAFC;
+      --bg-surface: #FFFFFF;
+      --bg-surface-hover: #F1F5F9;
+      --bg-inset: #F1F5F9;
+      --text-main: #0F172A;
+      --text-muted: #475569;
+      --border-color: #E2E8F0;
+      --border-hover: #CBD5E1;
+      --header-bg: rgba(255, 255, 255, 0.96);
+    }
+
     body {
-      background-color: #090A10;
-      color: #F1F5F9;
+      background-color: var(--bg-main);
+      color: var(--text-main);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      transition: background-color 0.2s ease, color 0.2s ease;
     }
     .hairline-border {
-      border: 1px solid rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border-color);
     }
     .hairline-border-b {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+      border-bottom: 1px solid var(--border-color);
     }
     .hairline-border-t {
-      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      border-top: 1px solid var(--border-color);
     }
     .card-surface {
-      background-color: #11131B;
-      border: 1px solid rgba(255, 255, 255, 0.07);
+      background-color: var(--bg-surface) !important;
+      border: 1px solid var(--border-color) !important;
+      color: var(--text-main);
     }
     .card-surface-interactive {
-      background-color: #11131B;
-      border: 1px solid rgba(255, 255, 255, 0.07);
+      background-color: var(--bg-surface) !important;
+      border: 1px solid var(--border-color) !important;
+      color: var(--text-main);
       transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .card-surface-interactive:hover {
-      background-color: #151824;
-      border-color: rgba(255, 255, 255, 0.16);
+      background-color: var(--bg-surface-hover) !important;
+      border-color: var(--border-hover) !important;
       transform: translateY(-1px);
     }
+
+    /* Light Mode Overrides */
+    html:not(.dark) header#app-header {
+      background-color: var(--header-bg) !important;
+      border-bottom: 1px solid #E2E8F0 !important;
+    }
+    html:not(.dark) .card-surface,
+    html:not(.dark) .card-surface-interactive {
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.04);
+    }
+    html:not(.dark) .card-surface-interactive:hover {
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.06), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+    }
+    html:not(.dark) input,
+    html:not(.dark) textarea,
+    html:not(.dark) select {
+      background-color: #FFFFFF !important;
+      border-color: #CBD5E1 !important;
+      color: #0F172A !important;
+    }
+    html:not(.dark) input::placeholder,
+    html:not(.dark) textarea::placeholder {
+      color: #94A3B8 !important;
+    }
+    html:not(.dark) .bg-\[\#090A10\] {
+      background-color: #F1F5F9 !important;
+      border-color: #E2E8F0 !important;
+    }
+    html:not(.dark) .bg-\[\#11131B\] {
+      background-color: #FFFFFF !important;
+    }
+    html:not(.dark) .text-white,
+    html:not(.dark) .text-zinc-100 {
+      color: #0F172A !important;
+    }
+    html:not(.dark) .text-zinc-200 {
+      color: #1E293B !important;
+    }
+    html:not(.dark) .text-zinc-300 {
+      color: #334155 !important;
+    }
+    html:not(.dark) .text-zinc-400 {
+      color: #475569 !important;
+    }
+    html:not(.dark) .text-zinc-500 {
+      color: #64748B !important;
+    }
+    html:not(.dark) .text-zinc-600 {
+      color: #94A3B8 !important;
+    }
+    html:not(.dark) .kbd {
+      background-color: #E2E8F0 !important;
+      color: #334155 !important;
+      border-color: #CBD5E1 !important;
+    }
+    html:not(.dark) .sg-badge {
+      color: #BE123C !important;
+      background-color: #FFE4E6 !important;
+      border-color: #FDA4AF !important;
+    }
+    html:not(.dark) #blind-mode-pill {
+      background-color: #D1FAE5 !important;
+      color: #065F46 !important;
+      border-color: #A7F3D0 !important;
+    }
+    html:not(.dark) .bg-zinc-100 {
+      background-color: #0F172A !important;
+      color: #FFFFFF !important;
+    }
+    html:not(.dark) .bg-zinc-100:hover {
+      background-color: #1E293B !important;
+    }
+    html:not(.dark) .sticky .bg-\[\#11131B\]\/95 {
+      background-color: rgba(255, 255, 255, 0.96) !important;
+      border-color: #E2E8F0 !important;
+    }
+    html:not(.dark) ::-webkit-scrollbar-track { background: #F8FAFC; }
+    html:not(.dark) ::-webkit-scrollbar-thumb { background: #CBD5E1; }
+    html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
     @keyframes pulse-listening {
       0%, 100% { transform: scale(1); opacity: 1; }
       50% { transform: scale(1.06); opacity: 0.8; }
@@ -179,8 +300,19 @@
         </div>
       </div>
 
-      <!-- Right Actions: Pace Guide + Approach Drawer + Random Case -->
+      <!-- Right Actions: Arena Circuit + Pace Guide + Approach Drawer + Theme + Random Case -->
       <div class="flex items-center gap-2">
+        <button
+          onclick="startArenaCircuit()"
+          id="circuit-btn"
+          class="px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/35 hover:border-amber-400 text-xs sm:text-sm text-amber-300 font-bold flex items-center gap-1.5 transition min-h-[40px]"
+          title="Start 3-Station Mock Exam Circuit (OSCE Arena / RehearseMD)"
+        >
+          <span>⚡</span>
+          <span class="hidden md:inline">Arena</span>
+          <span class="hidden sm:inline">Circuit</span>
+        </button>
+
         <button
           onclick="toggleTimeGuidePopover()"
           id="time-guide-btn"
@@ -200,6 +332,16 @@
         >
           <i class="fa-solid fa-book-medical text-zinc-400 text-xs"></i>
           <span class="hidden sm:inline font-medium">Approach Guide</span>
+        </button>
+
+        <button
+          onclick="toggleThemeMode()"
+          id="theme-toggle-btn"
+          class="px-2.5 sm:px-3 py-2 rounded-xl card-surface hover:border-zinc-500 text-xs sm:text-sm text-zinc-200 flex items-center justify-center transition min-h-[40px] min-w-[40px]"
+          title="Toggle Light / Dark Mode"
+          aria-label="Toggle Light or Dark Mode"
+        >
+          <span id="theme-toggle-icon">☀️</span>
         </button>
 
         <button
@@ -291,6 +433,29 @@
           <span id="blind-mode-label" class="text-zinc-200">Blind Mode</span>
           <span id="blind-mode-pill" class="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">ON</span>
         </button>
+      </div>
+
+      <!-- Arena Circuit & Daily Challenge Hero (OSCE Arena / RehearseMD / Doctordle) -->
+      <div id="arena-banner" class="card-surface rounded-xl p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-l-4 border-l-emerald-400">
+        <div class="space-y-1 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-mono uppercase tracking-wider text-emerald-400 font-bold">⚡ Arena Circuit Challenge</span>
+            <span class="text-xs text-zinc-400">• 3 Stations Back-to-Back</span>
+            <span id="streak-counter-pill" class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-semibold">🔥 0 Streak</span>
+          </div>
+          <h2 class="text-sm sm:text-base font-bold text-white">High-Stakes Clinical Reasoning Circuit</h2>
+          <p class="text-xs sm:text-sm text-zinc-300 leading-relaxed">
+            Formulate targeted clinical questions yourself, clear critical safety red flags, interpret bedside diagnostic twists, and avoid cognitive traps.
+          </p>
+        </div>
+        <div class="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+          <button
+            onclick="startArenaCircuit()"
+            class="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-sm min-h-[42px]"
+          >
+            <span>⚡ Start 3-Station Circuit</span>
+          </button>
+        </div>
       </div>
 
       <!-- Local progress (filled by app.js from localStorage) -->
@@ -409,60 +574,63 @@
           </div>
         </div>
 
-        <!-- Progress Counter & Peek Actions -->
-        <div class="pt-3.5 hairline-border-t flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
-          <div class="flex items-center gap-4">
-            <div class="flex items-center gap-2">
+        <!-- System 1 Initial Diagnostic Impulse (Practicum Script Dual-Process) -->
+        <div id="system1-impulse-box" class="pt-3 hairline-border-t space-y-2">
+          <div class="flex items-center justify-between text-xs sm:text-sm">
+            <span class="font-bold text-emerald-400 flex items-center gap-1.5">
+              <span>⚡</span>
+              <span>System 1 Initial Diagnostic Impulse:</span>
+            </span>
+            <span class="text-zinc-400 text-xs font-mono">1-tap initial hunch before history</span>
+          </div>
+          <div id="system1-chips-container" class="flex flex-wrap gap-2 pt-0.5">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- WhatsTheDx & Doctordle Style Game Bar & Safety Red Flag Tracker -->
+        <div class="pt-3 hairline-border-t flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
+          <div class="flex items-center gap-3 sm:gap-4 flex-wrap">
+            <div class="flex items-center gap-1.5 font-mono">
+              <span class="text-zinc-400">Turn:</span>
+              <span id="game-turn-counter" class="font-bold text-white">1</span>
+              <span class="text-zinc-500">/</span>
+              <span id="game-par-target" class="text-zinc-400" title="Par Question Count">5 Par</span>
+            </div>
+            <div class="flex items-center gap-1.5">
               <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
               <span class="text-zinc-300 font-medium">Red Flags:</span>
-              <span id="red-flags-counter" class="font-mono font-bold text-white text-sm sm:text-base">0/0</span>
+              <span id="red-flags-counter" class="font-mono font-bold text-white">0/0</span>
             </div>
-            <div class="flex items-center gap-2">
+            <div class="flex items-center gap-1.5">
               <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
               <span class="text-zinc-300 font-medium">Clues:</span>
-              <span id="gates-unlocked-counter" class="font-mono font-bold text-white text-sm sm:text-base">0/0</span>
+              <span id="gates-unlocked-counter" class="font-mono font-bold text-white">0/0</span>
             </div>
           </div>
 
-          <div class="flex items-center gap-2.5">
+          <div class="flex items-center gap-2">
+            <span id="game-combo-pill" class="hidden px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-300 font-mono text-xs font-bold border border-emerald-500/30">Combo x1</span>
             <button
               onclick="triggerInlineTwistBanner()"
               id="twist-trigger-btn"
               class="px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-xs sm:text-sm text-amber-300 hover:text-amber-200 font-semibold transition flex items-center gap-1.5 min-h-[38px]"
             >
               <span>⚡</span>
-              <span>Bedside Twist</span>
+              <span>Bedside Test</span>
             </button>
-            <button
-              onclick="toggleRevealMissedClues()"
-              id="reveal-clues-btn"
-              class="px-3 py-1.5 rounded-lg bg-[#090A10] hairline-border text-xs sm:text-sm text-zinc-300 hover:text-white font-medium transition min-h-[38px]"
-            >
-              Peek Clues
-            </button>
-          </div>
-        </div>
-
-        <!-- Peek Clues Checklist Drawer -->
-        <div id="gates-checklist-drawer" class="hidden pt-3 hairline-border-t space-y-2.5">
-          <div class="flex items-center justify-between text-xs sm:text-sm text-zinc-400">
-            <span>Tap any clue below to query immediately:</span>
-            <button onclick="fireSpamMacro('all_clinical')" class="text-emerald-400 hover:underline font-bold">Unlock All Clues</button>
-          </div>
-          <div id="gates-checklist-container" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-            <!-- Populated by JS -->
           </div>
         </div>
       </div>
 
-      <!-- THE BLITZ COMMAND BAR (Input & Rapid Sweep Macros) -->
+      <!-- THE CLINICAL INQUIRY COMMAND BAR (Candidate Formulates Questions) -->
       <div class="card-surface rounded-xl p-4 space-y-3 shadow-lg">
         <div class="flex items-center gap-2.5">
           <button
             onclick="toggleMicrophoneRecord()"
             id="mic-record-btn"
             class="w-12 h-12 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-zinc-300 hover:text-white flex items-center justify-center shrink-0 transition text-base"
-            title="1-Tap Continuous Voice Recognition"
+            title="1-Tap Continuous Voice Recognition (MLAbuddy / RehearseMD)"
           >
             <i class="fa-solid fa-microphone text-base" id="mic-icon"></i>
           </button>
@@ -470,7 +638,7 @@
           <input
             type="text"
             id="candidate-text-input"
-            placeholder="Ask anything or spam keywords: 'onset character fever travel meds'..."
+            placeholder="Ask patient in your own words (or hold mic to speak)..."
             class="flex-1 bg-[#090A10] hairline-border rounded-xl px-4 py-3 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 transition min-h-[48px]"
           >
 
@@ -478,69 +646,116 @@
             onclick="sendCandidateMessage()"
             class="px-5 py-3 rounded-xl bg-zinc-100 hover:bg-white text-zinc-950 font-bold text-sm sm:text-base shrink-0 transition min-h-[48px]"
           >
-            Ask ↵
+            Ask Patient ↵
           </button>
         </div>
 
-        <!-- 5 Clean 1-Tap Sweep Macros -->
-        <div class="flex items-center justify-between gap-2 flex-wrap pt-0.5">
-          <div class="flex flex-wrap items-center gap-2">
-            <button onclick="fireSpamMacro('socrates')" class="px-3.5 py-2.5 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-zinc-200 text-xs sm:text-sm font-semibold transition min-h-[44px]" title="Shortcut: Alt+1">
-              ⚡ SOCRATES <span class="hidden md:inline font-mono text-[10px] text-zinc-400 ml-1">Alt 1</span>
-            </button>
-            <button onclick="fireSpamMacro('red_flags')" class="px-3.5 py-2.5 rounded-xl bg-[#090A10] border border-rose-500/40 hover:border-rose-400 text-rose-200 text-xs sm:text-sm font-bold transition min-h-[44px]" title="Shortcut: Alt+2">
-              🚨 Red Flags <span class="hidden md:inline font-mono text-[10px] text-rose-300/80 ml-1">Alt 2</span>
-            </button>
-            <button onclick="fireSpamMacro('pmhx_meds')" class="px-3.5 py-2.5 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-zinc-200 text-xs sm:text-sm font-semibold transition min-h-[44px]" title="Shortcut: Alt+3">
-              💊 PMHx &amp; Meds <span class="hidden md:inline font-mono text-[10px] text-zinc-400 ml-1">Alt 3</span>
-            </button>
-            <button onclick="fireSpamMacro('social_epi')" class="px-3.5 py-2.5 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-zinc-200 text-xs sm:text-sm font-semibold transition min-h-[44px]" title="Shortcut: Alt+4">
-              🌏 Social &amp; Epi <span class="hidden md:inline font-mono text-[10px] text-zinc-400 ml-1">Alt 4</span>
-            </button>
-            <button onclick="fireSpamMacro('exam_vitals')" class="px-3.5 py-2.5 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-zinc-200 text-xs sm:text-sm font-semibold transition min-h-[44px]" title="Shortcut: Alt+5">
-              🩺 Exam &amp; Vitals <span class="hidden md:inline font-mono text-[10px] text-zinc-400 ml-1">Alt 5</span>
-            </button>
-          </div>
-
-          <button onclick="fireSpamMacro('all_clinical')" class="px-3 py-2 text-xs sm:text-sm font-semibold text-zinc-400 hover:text-emerald-300 font-mono transition min-h-[44px]" title="Shortcut: Alt+S">
-            Sweep All <span class="hidden md:inline font-mono text-[10px] text-zinc-500 ml-1">Alt S</span> →
+        <!-- Collapsible Clinical Inquiry Framework & Mental Checklist (Mnemonic Guide, NOT Answers) -->
+        <div class="pt-0.5 flex items-center justify-between">
+          <button
+            type="button"
+            onclick="toggleClinicalFrameworkGuide()"
+            class="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1.5 font-medium transition cursor-pointer"
+          >
+            <i class="fa-solid fa-lightbulb text-amber-400 text-xs"></i>
+            <span>Clinical Inquiry Mental Checklist (Mnemonic Guide)</span>
+            <span id="framework-guide-icon" class="text-xs font-mono text-zinc-500">▼</span>
           </button>
+          <span class="text-xs font-mono text-zinc-500 hidden sm:inline">Press Enter to ask • Alt+M for Mic</span>
+        </div>
+
+        <div id="clinical-framework-guide" class="hidden bg-[#090A10] hairline-border rounded-xl p-3.5 space-y-2 text-xs text-zinc-300">
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <div class="space-y-1">
+              <span class="font-bold text-emerald-400 uppercase tracking-wider text-[11px]">SOCRATES History</span>
+              <p class="text-zinc-400 leading-relaxed text-[11px]">Site, Onset, Character, Radiation, Associations, Timing, Exacerbating/Relieving, Severity (1-10).</p>
+            </div>
+            <div class="space-y-1">
+              <span class="font-bold text-rose-400 uppercase tracking-wider text-[11px]">Safety Red Flags</span>
+              <p class="text-zinc-400 leading-relaxed text-[11px]">Syncope, tearing back pain, hemoptysis, breathlessness, neurological deficits, bleeding.</p>
+            </div>
+            <div class="space-y-1">
+              <span class="font-bold text-sky-400 uppercase tracking-wider text-[11px]">PMHx &amp; Meds</span>
+              <p class="text-zinc-400 leading-relaxed text-[11px]">Hypertension, Diabetes, IHD, CKD, Anticoagulants/Antiplatelets, Allergies.</p>
+            </div>
+            <div class="space-y-1">
+              <span class="font-bold text-amber-400 uppercase tracking-wider text-[11px]">Systemic / Social</span>
+              <p class="text-zinc-400 leading-relaxed text-[11px]">Fever, chills, travel, smoking, alcohol, army/occupational exposures, family history.</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- INLINE BEDSIDE CLINICAL TWIST BANNER -->
+      <!-- INLINE BEDSIDE TWIST & SCRIPT CONCORDANCE TESTING (OSCE Sense + Practicum Script) -->
       <div id="inline-twist-banner" class="hidden card-surface rounded-xl p-4 sm:p-5 border-l-4 border-l-amber-400 space-y-3.5 shadow-md">
         <div class="flex items-start justify-between gap-2">
           <div>
-            <span class="text-xs font-mono uppercase tracking-wider text-amber-400 font-bold">⚡ Bedside Investigation Result</span>
+            <span class="text-xs font-mono uppercase tracking-wider text-amber-400 font-bold">⚡ Bedside Diagnostic Result</span>
             <h3 id="twist-title" class="text-sm sm:text-base font-bold text-zinc-100 mt-0.5">Interim Clinical Update</h3>
           </div>
-          <span id="twist-status-pill" class="text-xs font-mono px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 font-semibold">1-Tap Pivot</span>
+          <span id="twist-status-pill" class="text-xs font-mono px-2.5 py-1 rounded-md bg-amber-500/10 text-amber-300 border border-amber-500/30 font-semibold">Script Concordance Test</span>
         </div>
 
         <div id="twist-findings-box" class="bg-[#090A10] hairline-border rounded-xl p-3.5 font-mono text-xs sm:text-sm text-zinc-200 space-y-1.5 leading-relaxed">
           <!-- Populated by JS -->
         </div>
 
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
-          <span class="text-xs sm:text-sm text-zinc-300 font-medium">
-            How does this affect <strong id="twist-target-hypothesis" class="text-white">Primary Hypothesis</strong>?
-          </span>
-          <div class="flex items-center gap-2 shrink-0">
-            <button onclick="submitQuickTwistVote('supports')" id="twist-btn-supports" class="px-4 py-2.5 rounded-xl bg-[#090A10] border border-emerald-500/40 hover:border-emerald-400 text-xs sm:text-sm text-emerald-300 font-bold transition min-h-[44px]">
-              + Supports
+        <!-- Practicum Script 5-Point SCT Likert Scale -->
+        <div class="space-y-2 pt-1">
+          <div class="text-xs sm:text-sm text-zinc-300 font-medium">
+            If thinking of <strong id="twist-target-hypothesis" class="text-white">Primary Hypothesis</strong>, how does this finding affect its likelihood?
+          </div>
+          <div class="grid grid-cols-5 gap-1.5 sm:gap-2">
+            <button onclick="submitSctTwistVote(-2)" id="sct-btn-neg2" class="p-2 sm:p-2.5 rounded-xl bg-[#090A10] border border-rose-500/40 hover:border-rose-400 text-center transition min-h-[44px]">
+              <div class="font-mono font-black text-rose-400 text-sm sm:text-base">-2</div>
+              <div class="text-[9px] sm:text-[10px] text-zinc-400 font-semibold leading-tight mt-0.5">Ruled Out</div>
             </button>
-            <button onclick="submitQuickTwistVote('refutes')" id="twist-btn-refutes" class="px-4 py-2.5 rounded-xl bg-[#090A10] border border-rose-500/40 hover:border-rose-400 text-xs sm:text-sm text-rose-300 font-bold transition min-h-[44px]">
-              – Refutes
+            <button onclick="submitSctTwistVote(-1)" id="sct-btn-neg1" class="p-2 sm:p-2.5 rounded-xl bg-[#090A10] border border-amber-500/40 hover:border-amber-400 text-center transition min-h-[44px]">
+              <div class="font-mono font-black text-amber-400 text-sm sm:text-base">-1</div>
+              <div class="text-[9px] sm:text-[10px] text-zinc-400 font-semibold leading-tight mt-0.5">Less Likely</div>
             </button>
-            <button onclick="submitQuickTwistVote('neutral')" id="twist-btn-neutral" class="px-4 py-2.5 rounded-xl bg-[#090A10] border border-zinc-600 hover:border-zinc-400 text-xs sm:text-sm text-zinc-300 font-bold transition min-h-[44px]">
-              0 Neutral
+            <button onclick="submitSctTwistVote(0)" id="sct-btn-zero" class="p-2 sm:p-2.5 rounded-xl bg-[#090A10] border border-zinc-600 hover:border-zinc-400 text-center transition min-h-[44px]">
+              <div class="font-mono font-black text-zinc-300 text-sm sm:text-base">0</div>
+              <div class="text-[9px] sm:text-[10px] text-zinc-400 font-semibold leading-tight mt-0.5">Neutral</div>
+            </button>
+            <button onclick="submitSctTwistVote(1)" id="sct-btn-pos1" class="p-2 sm:p-2.5 rounded-xl bg-[#090A10] border border-sky-500/40 hover:border-sky-400 text-center transition min-h-[44px]">
+              <div class="font-mono font-black text-sky-400 text-sm sm:text-base">+1</div>
+              <div class="text-[9px] sm:text-[10px] text-zinc-400 font-semibold leading-tight mt-0.5">More Likely</div>
+            </button>
+            <button onclick="submitSctTwistVote(2)" id="sct-btn-pos2" class="p-2 sm:p-2.5 rounded-xl bg-[#090A10] border border-emerald-500/40 hover:border-emerald-400 text-center transition min-h-[44px]">
+              <div class="font-mono font-black text-emerald-400 text-sm sm:text-base">+2</div>
+              <div class="text-[9px] sm:text-[10px] text-zinc-400 font-semibold leading-tight mt-0.5">Supported</div>
             </button>
           </div>
         </div>
 
-        <div id="twist-rationale-box" class="hidden pt-3 hairline-border-t text-xs sm:text-sm text-zinc-300 leading-relaxed bg-[#090A10] p-3.5 rounded-xl">
-          <!-- Rationale shown after vote -->
+        <!-- Expert Attending Consensus Distribution Panel -->
+        <div id="twist-consensus-panel" class="hidden pt-3 hairline-border-t space-y-2.5 bg-[#090A10] p-3.5 rounded-xl">
+          <div class="flex items-center justify-between text-xs">
+            <span class="font-bold text-emerald-400 uppercase tracking-wider">Expert Attending Panel Consensus</span>
+            <span id="sct-score-pill" class="font-mono font-bold text-white px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30">100% Concordance</span>
+          </div>
+          <div id="sct-distribution-bars" class="space-y-1.5 text-xs font-mono">
+            <!-- Populated by JS -->
+          </div>
+          <div id="twist-rationale-box" class="pt-2 text-xs sm:text-sm text-zinc-300 leading-relaxed border-t border-white/5">
+            <!-- Rationale shown after vote -->
+          </div>
+        </div>
+
+        <!-- Geeky Medics Crossout! Elimination Challenge -->
+        <div id="crossout-challenge-box" class="hidden pt-3 hairline-border-t space-y-2">
+          <div class="flex items-center justify-between text-xs sm:text-sm">
+            <span class="font-bold text-rose-300 flex items-center gap-1.5">
+              <span>✂️</span>
+              <span>Crossout! Challenge: Which differential is RULED OUT by this finding?</span>
+            </span>
+            <span class="text-xs text-zinc-400 font-mono">Tap to eliminate</span>
+          </div>
+          <div id="crossout-options-container" class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <!-- Populated by JS -->
+          </div>
+          <div id="crossout-feedback" class="hidden text-xs sm:text-sm font-medium px-3 py-2 rounded-lg"></div>
         </div>
       </div>
 
@@ -584,43 +799,45 @@
           </button>
         </div>
 
-        <!-- Input 1: Working Diagnosis -->
-        <div class="space-y-2.5">
+        <!-- Input 1: Primary Working Diagnosis -->
+        <div class="space-y-2">
           <div class="flex items-center justify-between">
-            <label for="dx-input" class="text-xs sm:text-sm font-bold text-zinc-100">1. Top Diagnosis &amp; Key Differentials</label>
-            <span class="text-xs text-zinc-400">Tap suggestions or type</span>
+            <label for="dx-input" class="text-xs sm:text-sm font-bold text-zinc-100">1. Primary Working Diagnosis</label>
+            <span class="text-xs text-zinc-400">Your most likely diagnosis</span>
           </div>
           <input
             type="text"
             id="dx-input"
-            placeholder="e.g. Severe Dengue Shock Syndrome; differentials: Melioidosis, Sepsis..."
+            placeholder="e.g. Acute Inferior STEMI with Right Ventricular Infarction..."
             class="w-full bg-[#090A10] hairline-border rounded-xl px-4 py-3 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 transition min-h-[48px]"
           >
-          <div id="dx-suggestion-chips" class="flex flex-wrap gap-2 pt-0.5">
-            <!-- Populated by JS -->
-          </div>
         </div>
 
-        <!-- Input 2: Investigations & Management -->
-        <div class="space-y-2.5">
+        <!-- Input 2: Must-Not-Miss Red Flag Differential -->
+        <div class="space-y-2">
+          <div class="flex items-center justify-between">
+            <label for="red-flag-dx-input" class="text-xs sm:text-sm font-bold text-rose-300">2. Must-Not-Miss Red Flag Differential</label>
+            <span class="text-xs text-zinc-400">Critical emergency to rule out</span>
+          </div>
+          <input
+            type="text"
+            id="red-flag-dx-input"
+            placeholder="e.g. Acute Aortic Dissection Stanford Type A, Pulmonary Embolism..."
+            class="w-full bg-[#090A10] hairline-border rounded-xl px-4 py-3 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 transition min-h-[48px]"
+          >
+        </div>
+
+        <!-- Input 3: Investigations & Management Plan -->
+        <div class="space-y-2">
           <div class="flex flex-wrap items-center justify-between gap-2">
-            <label for="viva-answer-input" class="text-xs sm:text-sm font-bold text-zinc-100">2. Immediate Investigations &amp; Management Plan</label>
-            <div class="flex items-center gap-2">
-              <button
-                type="button"
-                onclick="toggleVivaPromptsHelper()"
-                class="px-3 py-1.5 rounded-lg text-xs sm:text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition min-h-[36px]"
-              >
-                Examiner Prompts
-              </button>
-              <button
-                type="button"
-                onclick="autoFillModelPlan()"
-                class="px-3 py-1.5 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/35 text-xs sm:text-sm font-semibold transition min-h-[36px]"
-              >
-                ⚡ Auto-Fill Model Plan
-              </button>
-            </div>
+            <label for="viva-answer-input" class="text-xs sm:text-sm font-bold text-zinc-100">3. Immediate Investigations &amp; Management Plan (First 15-30 Mins)</label>
+            <button
+              type="button"
+              onclick="toggleVivaPromptsHelper()"
+              class="px-3 py-1.5 rounded-lg text-xs sm:text-sm text-zinc-300 hover:text-white underline underline-offset-2 transition min-h-[36px] cursor-pointer"
+            >
+              Examiner Prompts
+            </button>
           </div>
 
           <div id="viva-prompts-helper" class="hidden bg-[#090A10] hairline-border rounded-xl p-4 space-y-2.5 text-xs sm:text-sm text-zinc-300">
@@ -630,8 +847,8 @@
           <textarea
             id="viva-answer-input"
             rows="4"
-            placeholder="Key bedside investigations, labs, imaging, and acute resuscitation/management..."
-            class="w-full bg-[#090A10] hairline-border rounded-xl p-4 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 transition min-h-[130px] leading-relaxed"
+            placeholder="State STAT bedside tests, labs, imaging, immediate medical/surgical resuscitation, and escalation..."
+            class="w-full bg-[#090A10] hairline-border rounded-xl p-4 text-sm sm:text-base text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:border-zinc-400 transition min-h-[120px] leading-relaxed"
           ></textarea>
         </div>
 
@@ -700,10 +917,39 @@
           </div>
         </div>
 
-        <!-- Cognitive Traps Section (if any triggered) -->
+        <!-- Differentials Discriminating Matrix Card (Teaches Key Distinguishing Features) -->
+        <div id="card-differentials-section" class="space-y-2.5 pt-2 hairline-border-t">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-sky-400">Diagnostic Discrimination Matrix</h3>
+            <span class="text-xs text-zinc-400 font-mono">High-Yield Finals Distinctions</span>
+          </div>
+          <div id="card-differentials-table" class="space-y-2 text-xs sm:text-sm">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Cognitive Traps & Dual-Process Audit (Practicum Script) -->
         <div id="card-traps-section" class="hidden space-y-2.5 pt-2 hairline-border-t">
-          <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400">Clinical Pitfalls</h3>
+          <h3 class="text-xs sm:text-sm font-bold uppercase tracking-wider text-amber-400">Clinical Cognitive Bias &amp; Trap Audit</h3>
           <div id="card-traps-container" class="space-y-2 text-xs sm:text-sm"></div>
+        </div>
+
+        <!-- Turn-by-Turn Examiner Transcript & Rubric Review -->
+        <div class="pt-2 hairline-border-t">
+          <button
+            type="button"
+            onclick="toggleTranscriptDrawer()"
+            class="w-full py-2.5 px-3 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-xs sm:text-sm font-medium text-zinc-300 hover:text-white flex items-center justify-between transition cursor-pointer"
+          >
+            <span class="flex items-center gap-2">
+              <i class="fa-solid fa-list-check text-emerald-400 text-xs"></i>
+              <span>Turn-by-Turn Examiner Transcript &amp; Marking Scheme</span>
+            </span>
+            <span id="transcript-drawer-icon" class="text-xs font-mono text-zinc-500">▼ Expand</span>
+          </button>
+          <div id="examiner-transcript-drawer" class="hidden mt-2.5 space-y-2 text-xs text-zinc-300 bg-[#090A10] p-4 rounded-xl hairline-border max-h-80 overflow-y-auto">
+            <!-- Populated by JS -->
+          </div>
         </div>
       </div>
 
@@ -735,13 +981,13 @@
             <span>🔄</span>
             <span>Retry Station</span>
           </button>
-          <button onclick="copyMarkdownReport()" class="px-4 py-2.5 rounded-xl card-surface hover:border-zinc-500 text-xs sm:text-sm font-semibold text-zinc-200 transition min-h-[46px]">
-            📋 Copy Report
+          <button onclick="copyShareableScorecard()" id="share-scorecard-btn" class="px-4 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/35 hover:border-emerald-400 text-xs sm:text-sm font-bold text-emerald-300 transition min-h-[46px]">
+            📋 Share Scorecard (Wordle Style)
           </button>
           <button onclick="window.print()" class="px-4 py-2.5 rounded-xl card-surface hover:border-zinc-500 text-xs sm:text-sm font-semibold text-zinc-200 transition min-h-[46px]">
             🖨️ Print / Save PDF
           </button>
-          <button onclick="startRandomCase()" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs sm:text-sm transition shadow-md min-h-[46px]">
+          <button onclick="handleNextStationAction()" id="next-station-action-btn" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-bold text-xs sm:text-sm transition shadow-md min-h-[46px]">
             🎲 Next Random Case →
           </button>
         </div>

@@ -348,23 +348,61 @@ let timerInterval = null;
 let targetSeconds = 90;
 let elapsedSeconds = 0;
 let isVoiceOutputEnabled = false; // Default: Silent Text
-let revealMissedClues = false;
 let latestMarkdownReport = "";
+let arenaCircuitState = null; // { active: boolean, stationIndex: number, stationIds: string[], scores: number[] }
 
 let clientSession = {
   unlockedGateKeys: new Set(),
-  assistedGateKeys: new Set(), // unlocked by a macro or click, not a typed question
+  assistedGateKeys: new Set(),
   turnCount: 0,
+  parQuestions: 5,
+  system1Impulse: null,
+  sctVote: null,
+  sctConcordance: 100.0,
+  crossoutChosen: null,
+  crossoutCorrect: null,
+  comboCount: 0,
   perturbationTriggered: false,
   perturbationVoted: false,
-  perturbationConcordance: 85.0,
   perturbationReasoning: "",
+  transcriptTurns: [],
   vivaScores: {},
   vivaAnswers: []
 };
 
 let speechRecognizer = null;
 let isRecording = false;
+
+// -------------------------------------------------------------
+// THEME ENGINE (LIGHT & DARK MODE)
+// -------------------------------------------------------------
+function initTheme() {
+  try {
+    const saved = localStorage.getItem("osceblitz.theme");
+    const prefersDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+    if (saved === "light" || (!saved && !prefersDark)) {
+      document.documentElement.classList.remove("dark");
+    } else {
+      document.documentElement.classList.add("dark");
+    }
+  } catch (e) {}
+  updateThemeToggleIcon();
+}
+
+function toggleThemeMode() {
+  const isDark = document.documentElement.classList.toggle("dark");
+  try {
+    localStorage.setItem("osceblitz.theme", isDark ? "dark" : "light");
+  } catch (e) {}
+  updateThemeToggleIcon();
+}
+
+function updateThemeToggleIcon() {
+  const icon = document.getElementById("theme-toggle-icon");
+  if (!icon) return;
+  const isDark = document.documentElement.classList.contains("dark");
+  icon.innerText = isDark ? "☀️" : "🌙";
+}
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, c => ({
@@ -376,6 +414,7 @@ function escapeHtml(value) {
 // INITIALIZATION
 // -------------------------------------------------------------
 document.addEventListener("DOMContentLoaded", async () => {
+  initTheme();
   await loadCases();
   renderSymptomApproachDrawer(activeApproachCluster);
 
@@ -394,12 +433,22 @@ document.addEventListener("DOMContentLoaded", async () => {
     dxInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
         e.preventDefault();
+        document.getElementById("red-flag-dx-input")?.focus();
+      }
+    });
+  }
+
+  const rfDxInput = document.getElementById("red-flag-dx-input");
+  if (rfDxInput) {
+    rfDxInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
         document.getElementById("viva-answer-input")?.focus();
       }
     });
   }
 
-  // Hotkey support: Speed-run shortcuts for rapid navigation
+  // Hotkey support: Speed-run shortcuts for rapid clinical inquiry
   document.addEventListener("keydown", (e) => {
     const activeEl = document.activeElement;
     const isInputActive = activeEl && (activeEl.tagName === "INPUT" || activeEl.tagName === "TEXTAREA" || activeEl.isContentEditable);
@@ -423,15 +472,9 @@ document.addEventListener("DOMContentLoaded", async () => {
       document.getElementById("symptom-approach-drawer")?.classList.add("hidden");
       if (activeEl && activeEl.id === "station-search-input") activeEl.blur();
     } else if (e.altKey && isConsultActive) {
-      if (e.key === "1") { e.preventDefault(); fireSpamMacro("socrates"); }
-      else if (e.key === "2") { e.preventDefault(); fireSpamMacro("red_flags"); }
-      else if (e.key === "3") { e.preventDefault(); fireSpamMacro("pmhx_meds"); }
-      else if (e.key === "4") { e.preventDefault(); fireSpamMacro("social_epi"); }
-      else if (e.key === "5") { e.preventDefault(); fireSpamMacro("exam_vitals"); }
-      else if (e.key === "s" || e.key === "S") { e.preventDefault(); fireSpamMacro("all_clinical"); }
-      else if (e.key === "t" || e.key === "T") { e.preventDefault(); triggerInlineTwistBanner(); }
-      else if (e.key === "c" || e.key === "C") { e.preventDefault(); toggleRevealMissedClues(); }
+      if (e.key === "t" || e.key === "T") { e.preventDefault(); triggerInlineTwistBanner(); }
       else if (e.key === "m" || e.key === "M") { e.preventDefault(); toggleMicrophoneRecord(); }
+      else if (e.key === "f" || e.key === "F") { e.preventDefault(); toggleClinicalFrameworkGuide(); }
       else if (e.key === "Enter") { e.preventDefault(); openDiagnosisAndVivaStep(); }
     } else if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       if (isVivaActive) {
@@ -443,7 +486,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     } else if (isScoreActive && e.altKey) {
       if (e.key === "r" || e.key === "R") { e.preventDefault(); retryCurrentStation(); }
-      else if (e.key === "n" || e.key === "N") { e.preventDefault(); startRandomCase(); }
+      else if (e.key === "n" || e.key === "N") { e.preventDefault(); handleNextStationAction(); }
       else if (e.key === "l" || e.key === "L") { e.preventDefault(); exitStationToLibrary(); }
     }
   });
@@ -983,8 +1026,6 @@ async function launchInstantBlitz(caseId) {
 async function startConsultationSession() {
   if (!activeCase) return;
   activeCase = getFreshCaseCopy(activeCase.id);
-  revealMissedClues = false;
-  updateRevealButtonUI();
 
   activeSessionId = `blitz-${activeCase.id}-${Date.now()}`;
   targetSeconds = Number(activeCase.target_seconds) || 90;
@@ -992,12 +1033,19 @@ async function startConsultationSession() {
 
   clientSession = {
     unlockedGateKeys: new Set(),
-    assistedGateKeys: new Set(), // unlocked by a macro or click, not a typed question
+    assistedGateKeys: new Set(),
     turnCount: 0,
+    parQuestions: 5,
+    system1Impulse: null,
+    sctVote: null,
+    sctConcordance: 100.0,
+    crossoutChosen: null,
+    crossoutCorrect: null,
+    comboCount: 0,
     perturbationTriggered: false,
     perturbationVoted: false,
-    perturbationConcordance: 85.0,
     perturbationReasoning: "",
+    transcriptTurns: [],
     vivaScores: {},
     vivaAnswers: []
   };
@@ -1042,9 +1090,14 @@ async function startConsultationSession() {
   const cue = (activeCase.persona?.behavioral_cues || [])[0] || "";
   document.getElementById("consult-behavioral-cue").innerText = cue ? `[${cue}]` : "";
 
-  // Reset Twist Banner & Findings Stream
-  const twistBanner = document.getElementById("inline-twist-banner");
-  if (twistBanner) twistBanner.classList.add("hidden");
+  // 3. Initialize System 1 Initial Diagnostic Impulse Chips (Practicum Script)
+  initSystem1Impulse();
+
+  // 4. Reset Twist Banner, Framework Guide, Findings Stream & Counters
+  document.getElementById("inline-twist-banner")?.classList.add("hidden");
+  document.getElementById("clinical-framework-guide")?.classList.add("hidden");
+  document.getElementById("twist-consensus-panel")?.classList.add("hidden");
+  document.getElementById("crossout-challenge-box")?.classList.add("hidden");
 
   const chatContainer = document.getElementById("chat-messages");
   if (chatContainer) chatContainer.innerHTML = "";
@@ -1055,7 +1108,7 @@ async function startConsultationSession() {
   }
 
   startTargetCountdownTimer();
-  renderGateChecklist();
+  updateGameCountersUI();
   showView("consultation-view");
 
   setTimeout(() => {
@@ -1139,36 +1192,61 @@ const GENERAL_NEGATIVE_EXCLUSIONS = {
   "rash": "No other generalized rash"
 };
 
-function evaluateBlitzQueryClientSide(queryText, forcedCategories = null, assisted = false) {
+function evaluateBlitzQueryClientSide(queryText) {
   if (!activeCase) return null;
   const textLower = queryText.toLowerCase();
   const newlyUnlocked = [];
   const previouslyUnlocked = [];
 
+  // Match against clinical gates
   (activeCase.gates || []).forEach(gate => {
     const isRedFlag = (gate.mandatory_for_safety || gate.category === "red_flag") && gate.category !== "past_history";
-    // Macros can NEVER force-unlock safety red flags!
-    const matchesCategoryMacro = forcedCategories && forcedCategories.includes(gate.category) && !isRedFlag;
-    const triggers = gate.trigger_concepts || gate.triggers || [];
+    const triggers = gate.trigger_concepts || gate.triggers || gate.trigger_keywords || [];
     const matchesConcept = triggers.some(c => conceptMatchesText(c, textLower)) ||
       (!isRedFlag && textLower.includes(gate.key.replace(/_/g, " ").toLowerCase()));
 
-    if (matchesCategoryMacro || matchesConcept) {
-      const prompted = assisted || (!!forcedCategories && !matchesConcept);
+    if (matchesConcept) {
       if (!clientSession.unlockedGateKeys.has(gate.key)) {
         gate.unlocked = true;
         clientSession.unlockedGateKeys.add(gate.key);
-        if (prompted) clientSession.assistedGateKeys.add(gate.key);
         newlyUnlocked.push(gate);
       } else {
-        if (!prompted && matchesConcept) clientSession.assistedGateKeys.delete(gate.key);
         previouslyUnlocked.push(gate);
       }
     }
   });
 
+  // Also check activeCase.red_flags directly if available
+  (activeCase.red_flags || []).forEach(rf => {
+    const triggers = rf.trigger_keywords || rf.trigger_concepts || [];
+    const matches = triggers.some(c => conceptMatchesText(c, textLower)) ||
+      textLower.includes((rf.name || "").toLowerCase()) ||
+      textLower.includes((rf.id || "").replace(/_/g, " ").toLowerCase());
+
+    if (matches) {
+      const key = rf.id || rf.name;
+      if (!clientSession.unlockedGateKeys.has(key)) {
+        clientSession.unlockedGateKeys.add(key);
+        // Find existing gate or create representation
+        const existingGate = (activeCase.gates || []).find(g => g.key === key || g.id === key);
+        if (existingGate && !newlyUnlocked.includes(existingGate)) {
+          existingGate.unlocked = true;
+          newlyUnlocked.push(existingGate);
+        } else if (!existingGate) {
+          newlyUnlocked.push({
+            key,
+            category: "red_flag",
+            mandatory_for_safety: true,
+            response_text: rf.patient_response || "Negative for this red flag.",
+            examiner_note: rf.clinical_rationale || ""
+          });
+        }
+      }
+    }
+  });
+
   const matchedTextCombined = [...newlyUnlocked, ...previouslyUnlocked]
-    .map(g => `${g.key} ${(g.trigger_concepts || g.triggers || []).join(" ")} ${g.response_text || g.response || ""}`)
+    .map(g => `${g.key} ${(g.trigger_concepts || g.triggers || g.trigger_keywords || []).join(" ")} ${g.response_text || g.response || ""}`)
     .join(" ")
     .toLowerCase();
 
@@ -1180,6 +1258,12 @@ function evaluateBlitzQueryClientSide(queryText, forcedCategories = null, assist
   });
 
   clientSession.turnCount += 1;
+
+  // Track combo: if any newly unlocked gate was a safety red flag
+  const newlyRf = newlyUnlocked.filter(g => g.mandatory_for_safety || g.category === "red_flag");
+  if (newlyRf.length > 0) {
+    clientSession.comboCount += newlyRf.length;
+  }
 
   const totalClin = (activeCase.gates || []).filter(g => g.category !== "ice").length;
   const unlockedClin = (activeCase.gates || []).filter(g => g.category !== "ice" && clientSession.unlockedGateKeys.has(g.key)).length;
@@ -1197,71 +1281,37 @@ function evaluateBlitzQueryClientSide(queryText, forcedCategories = null, assist
   };
 }
 
-function fireSpamMacro(macroType) {
-  if (!activeCase) return;
-
-  let macroQuery = "";
-  let forcedCategories = [];
-  let macroTitle = "";
-
-  if (macroType === "socrates") {
-    macroTitle = "⚡ SOCRATES";
-    macroQuery = "site onset character radiation associated symptoms timing exacerbating relieving severity";
-    forcedCategories = ["socrates"];
-  } else if (macroType === "red_flags") {
-    macroTitle = "🚨 Red Flags";
-    macroQuery = "fever weight loss night sweats neuro deficits syncope bleeding shortness of breath chest pain vomiting blood altered mental state";
-    forcedCategories = [];
-  } else if (macroType === "pmhx_meds") {
-    macroTitle = "💊 PMHx & Meds";
-    macroQuery = "past medical history diabetes hypertension surgery medications blood thinners allergies compliance";
-    forcedCategories = ["past_history", "drug_history"];
-  } else if (macroType === "social_epi") {
-    macroTitle = "Social & Epi";
-    macroQuery = "occupation army camp tekong travel hawker food smoking alcohol family history";
-    forcedCategories = ["social"];
-  } else if (macroType === "exam_vitals") {
-    macroTitle = "🩺 Exam & Vitals";
-    macroQuery = "physical examination abdomen chest neuro pupils joints rash vitals";
-    forcedCategories = ["systemic"];
-  } else if (macroType === "all_clinical") {
-    macroTitle = "Sweep All";
-    macroQuery = "site onset character radiation severity past medical history medications allergies social travel physical examination vitals";
-    forcedCategories = ["socrates", "past_history", "drug_history", "social", "systemic"];
-  }
-
-  executeBlitzTurn(macroQuery, forcedCategories, macroTitle, true);
-}
-
-function unlockSingleGateByClick(gateKey) {
-  if (!activeCase) return;
-  const gate = (activeCase.gates || []).find(g => g.key === gateKey);
-  if (!gate) return;
-  const triggerWord = (gate.trigger_concepts || gate.triggers || [])[0] || gate.key.replace(/_/g, " ");
-  executeBlitzTurn(triggerWord, null, formatGateTitle(gate.key), true);
-}
-
 function sendCandidateMessage() {
   const input = document.getElementById("candidate-text-input");
   const text = input ? input.value.trim() : "";
   if (!text || !activeCase) return;
   input.value = "";
-  executeBlitzTurn(text, null, null);
+  executeBlitzTurn(text);
 }
 
-function executeBlitzTurn(queryText, forcedCategories = null, macroBadge = null, assisted = false) {
-  const result = evaluateBlitzQueryClientSide(queryText, forcedCategories, assisted);
+function executeBlitzTurn(queryText) {
+  const result = evaluateBlitzQueryClientSide(queryText);
   if (!result) return;
 
-  appendMinimalistFindingCard(result, queryText, macroBadge);
-  renderGateChecklist();
+  // Record into transcript turns for examiner review
+  clientSession.transcriptTurns.push({
+    turn: clientSession.turnCount,
+    query: queryText,
+    newlyUnlocked: result.newlyUnlocked.map(g => formatGateTitle(g.key)),
+    pertinentNegatives: result.pertinentNegatives.map(n => n.keyword)
+  });
+
+  appendMinimalistFindingCard(result, queryText);
+  updateGameCountersUI();
 
   if (isVoiceOutputEnabled) {
     const spokenText = result.newlyUnlocked.length > 0
       ? result.newlyUnlocked.map(g => g.response_text || g.response).join(" ")
       : (result.previouslyUnlocked.length > 0
           ? (result.previouslyUnlocked[0].response_text || result.previouslyUnlocked[0].response)
-          : "Nothing else remarkable there, doctor.");
+          : (result.pertinentNegatives.length > 0
+              ? `No doctor, ${result.pertinentNegatives[0].detail.toLowerCase()}.`
+              : "No doctor, nothing like that."));
     speakPatientText(spokenText);
   }
 
@@ -1407,60 +1457,256 @@ function twistHypothesisLabel() {
   return String(twistHypothesisKey()).split("(")[0].trim();
 }
 
-function submitQuickTwistVote(voteType) {
+// -------------------------------------------------------------
+// SCRIPT CONCORDANCE TESTING (SCT) & BROWSER TWIST ENGINE
+// (Practicum Script 5-Point Likert Scale & Attending Distribution)
+// -------------------------------------------------------------
+function submitSctTwistVote(value) {
   if (!activeCase || !activeCase.perturbation) return;
+  clientSession.sctVote = value;
   clientSession.perturbationVoted = true;
 
   const pert = activeCase.perturbation;
   const primaryHyp = twistHypothesisKey();
   const targetEl = document.getElementById("twist-target-hypothesis");
   if (targetEl) targetEl.innerText = twistHypothesisLabel();
-  const expectedVal = (pert.expected_shifts && pert.expected_shifts[primaryHyp]) ?? 2;
 
-  const isCorrect =
-    (voteType === "supports" && expectedVal > 0) ||
-    (voteType === "refutes" && expectedVal < 0) ||
-    (voteType === "neutral" && expectedVal === 0);
+  const expectedShift = (pert.expected_shifts && pert.expected_shifts[primaryHyp]) ?? 2;
 
-  clientSession.perturbationConcordance = isCorrect ? 100.0 : 60.0;
-  clientSession.perturbationReasoning = `${primaryHyp}: ${voteType}`;
+  // Highlight chosen SCT button
+  const btnIds = {
+    "-2": "sct-btn-neg2",
+    "-1": "sct-btn-neg1",
+    "0": "sct-btn-zero",
+    "1": "sct-btn-pos1",
+    "2": "sct-btn-pos2"
+  };
+  Object.entries(btnIds).forEach(([valStr, btnId]) => {
+    const btn = document.getElementById(btnId);
+    if (!btn) return;
+    if (parseInt(valStr, 10) === value) {
+      btn.classList.add("ring-2", "ring-emerald-400", "bg-emerald-500/20");
+      btn.style.opacity = "1";
+    } else {
+      btn.classList.remove("ring-2", "ring-emerald-400", "bg-emerald-500/20");
+      btn.style.opacity = "0.5";
+    }
+  });
 
+  // Calculate SCT Concordance Score based on expert consensus distance
+  const diff = Math.abs(value - expectedShift);
+  let concordance = 100;
+  if (diff === 1) concordance = 75;
+  else if (diff === 2) concordance = 45;
+  else if (diff >= 3) concordance = 15;
+  clientSession.sctConcordance = concordance;
+  clientSession.perturbationConcordance = concordance;
+  clientSession.perturbationReasoning = `SCT Likert ${value > 0 ? "+" + value : value} (Expected ${expectedShift > 0 ? "+" + expectedShift : expectedShift})`;
+
+  // Update status pill
   const statusPill = document.getElementById("twist-status-pill");
   if (statusPill) {
-    statusPill.innerText = isCorrect ? "✓ Concordant (+2)" : "Reviewed";
-    statusPill.className = isCorrect
-      ? "text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 whitespace-nowrap"
-      : "text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 whitespace-nowrap";
+    statusPill.innerText = `SCT: ${concordance}% Concordance`;
+    statusPill.className = concordance >= 75
+      ? "text-xs font-mono px-2.5 py-1 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-semibold"
+      : "text-xs font-mono px-2.5 py-1 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold";
   }
+
+  // Render Attending Panel Consensus Distribution (Practicum Script style)
+  renderSctConsensusDistribution(expectedShift, value);
+
+  // Reveal consensus panel & expert rationale
+  const consensusPanel = document.getElementById("twist-consensus-panel");
+  if (consensusPanel) consensusPanel.classList.remove("hidden");
+
+  const scorePill = document.getElementById("sct-score-pill");
+  if (scorePill) scorePill.innerText = `${concordance}% Concordance`;
 
   const rationaleBox = document.getElementById("twist-rationale-box");
   if (rationaleBox) {
-    rationaleBox.innerHTML = `<strong class="text-zinc-200">Clinical Rationale:</strong> ${escapeHtml(pert.expert_rationale || "")}`;
+    rationaleBox.innerHTML = `
+      <div class="font-bold text-zinc-200 mb-1">Attending Panel Consensus Rationale:</div>
+      <div class="text-zinc-300 leading-relaxed">${escapeHtml(pert.expert_rationale || "")}</div>
+    `;
     rationaleBox.classList.remove("hidden");
   }
+
+  // Also initialize the Geeky Medics Crossout! mini-challenge if differentials available
+  initCrossoutChallenge();
+}
+
+function submitQuickTwistVote(voteType) {
+  const map = { supports: 2, refutes: -2, neutral: 0 };
+  const val = map[voteType] ?? 0;
+  submitSctTwistVote(val);
+}
+
+function renderSctConsensusDistribution(expectedVal, userVote) {
+  const container = document.getElementById("sct-distribution-bars");
+  if (!container) return;
+
+  // Realistic attending distribution centered around expectedVal
+  const dist = { "-2": 2, "-1": 4, "0": 6, "1": 15, "2": 73 };
+  if (expectedVal === 2) {
+    dist["2"] = 78; dist["1"] = 15; dist["0"] = 5; dist["-1"] = 2; dist["-2"] = 0;
+  } else if (expectedVal === 1) {
+    dist["2"] = 24; dist["1"] = 62; dist["0"] = 10; dist["-1"] = 4; dist["-2"] = 0;
+  } else if (expectedVal === 0) {
+    dist["2"] = 5; dist["1"] = 15; dist["0"] = 65; dist["-1"] = 12; dist["-2"] = 3;
+  } else if (expectedVal === -1) {
+    dist["2"] = 1; dist["1"] = 4; dist["0"] = 12; dist["-1"] = 63; dist["-2"] = 20;
+  } else if (expectedVal === -2) {
+    dist["2"] = 0; dist["1"] = 1; dist["0"] = 4; dist["-1"] = 18; dist["-2"] = 77;
+  }
+
+  const labels = {
+    "-2": "(-2) Ruled Out",
+    "-1": "(-1) Less Likely",
+    "0": "(0) Neutral",
+    "1": "(+1) More Likely",
+    "2": "(+2) Supported"
+  };
+
+  container.innerHTML = Object.entries(dist).map(([valStr, pct]) => {
+    const isUser = parseInt(valStr, 10) === userVote;
+    const isTarget = parseInt(valStr, 10) === expectedVal;
+    const barColor = isTarget ? "bg-emerald-400" : isUser ? "bg-amber-400" : "bg-zinc-600";
+    return `
+      <div class="flex items-center gap-2 text-xs">
+        <span class="w-28 text-zinc-300 shrink-0 font-medium ${isUser ? 'text-amber-300 font-bold' : ''}">
+          ${labels[valStr]} ${isUser ? '👈' : ''}
+        </span>
+        <div class="flex-1 h-3 rounded-full bg-zinc-800 overflow-hidden">
+          <div class="h-full ${barColor} rounded-full transition-all duration-500" style="width: ${pct}%"></div>
+        </div>
+        <span class="w-9 text-right font-mono text-zinc-400 shrink-0">${pct}%</span>
+      </div>
+    `;
+  }).join("");
 }
 
 // -------------------------------------------------------------
-// PROGRESS COUNTERS & PEEK MISSED CLUES DRAWER
+// GEEKY MEDICS "CROSSOUT!" ELIMINATION CHALLENGE
 // -------------------------------------------------------------
-function toggleRevealMissedClues() {
-  revealMissedClues = !revealMissedClues;
-  updateRevealButtonUI();
+function initCrossoutChallenge() {
+  const box = document.getElementById("crossout-challenge-box");
+  const container = document.getElementById("crossout-options-container");
+  if (!box || !container || !activeCase) return;
+
+  const pert = activeCase.perturbation;
+  const shifts = pert?.expected_shifts || {};
+
+  // Find a differential that is negative (< 0) or create candidates
+  const ruledOutCandidate = Object.entries(shifts).find(([k, v]) => v < 0);
+  const correctRuledOutName = ruledOutCandidate ? ruledOutCandidate[0].split("(")[0].trim() : null;
+
+  const diffs = (activeCase.differentials || []).map(d => d.name.split("(")[0].trim());
+  const options = [];
+  if (correctRuledOutName) options.push({ name: correctRuledOutName, isRuledOut: true });
+
+  diffs.forEach(d => {
+    if (d !== correctRuledOutName && options.length < 3) {
+      options.push({ name: d, isRuledOut: false });
+    }
+  });
+
+  const generic = ["Acute Appendicitis", "Community-Acquired Pneumonia", "Viral Gastroenteritis"];
+  generic.forEach(g => {
+    if (options.length < 3 && !options.some(o => o.name === g)) {
+      options.push({ name: g, isRuledOut: false });
+    }
+  });
+
+  const shuffled = options.sort(() => Math.random() - 0.5);
+
+  container.innerHTML = shuffled.map(opt => `
+    <button
+      type="button"
+      onclick="chooseCrossoutOption('${escapeHtml(opt.name)}', ${opt.isRuledOut})"
+      id="crossout-btn-${escapeHtml(opt.name).replace(/[^a-zA-Z0-9]/g, '')}"
+      class="crossout-option p-3 rounded-xl bg-[#090A10] hairline-border hover:border-rose-400 text-left text-xs sm:text-sm font-semibold text-zinc-200 transition min-h-[44px] flex items-center justify-between"
+    >
+      <span class="crossout-text truncate">${escapeHtml(opt.name)}</span>
+      <span class="text-xs text-rose-400 font-mono ml-1 shrink-0">✂️ Cross out</span>
+    </button>
+  `).join("");
+
+  box.classList.remove("hidden");
 }
 
-function updateRevealButtonUI() {
-  const drawer = document.getElementById("gates-checklist-drawer");
-  const btn = document.getElementById("reveal-clues-btn");
-  if (drawer) {
-    if (revealMissedClues) drawer.classList.remove("hidden");
-    else drawer.classList.add("hidden");
-  }
-  if (btn) {
-    btn.innerText = revealMissedClues ? "Hide Clues" : "Peek Missed Clues";
+function chooseCrossoutOption(name, isRuledOut) {
+  clientSession.crossoutChosen = name;
+  clientSession.crossoutCorrect = isRuledOut;
+
+  const feedback = document.getElementById("crossout-feedback");
+  const btn = document.getElementById(`crossout-btn-${name.replace(/[^a-zA-Z0-9]/g, '')}`);
+
+  document.querySelectorAll(".crossout-option").forEach(b => b.disabled = true);
+
+  if (isRuledOut) {
+    if (btn) {
+      btn.className = "crossout-option p-3 rounded-xl bg-rose-500/20 border border-rose-500 text-left text-xs sm:text-sm font-semibold text-rose-300 min-h-[44px] flex items-center justify-between line-through";
+    }
+    if (feedback) {
+      feedback.className = "text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 block";
+      feedback.innerHTML = `✓ <strong>Spot On!</strong> "${escapeHtml(name)}" is eliminated by these bedside findings (+100 XP Par Bonus).`;
+    }
+    clientSession.comboCount += 1;
+    updateGameCountersUI();
+  } else {
+    if (btn) {
+      btn.className = "crossout-option p-3 rounded-xl bg-amber-500/20 border border-amber-500 text-left text-xs sm:text-sm font-semibold text-amber-300 min-h-[44px] flex items-center justify-between";
+    }
+    if (feedback) {
+      feedback.className = "text-xs sm:text-sm font-semibold px-3 py-2 rounded-lg bg-amber-500/15 border border-amber-500/40 text-amber-300 block";
+      feedback.innerHTML = `⚠️ <strong>Careful:</strong> "${escapeHtml(name)}" is NOT ruled out by this finding. Review the diagnostic discrimination matrix.`;
+    }
   }
 }
 
-function renderGateChecklist() {
+// -------------------------------------------------------------
+// PRACTICUM SCRIPT: SYSTEM 1 INITIAL DIAGNOSTIC IMPULSE
+// -------------------------------------------------------------
+function initSystem1Impulse() {
+  const container = document.getElementById("system1-chips-container");
+  if (!container || !activeCase) return;
+
+  const diffs = (activeCase.differentials || []).map(d => d.name.split("(")[0].trim());
+  const pertHyps = Object.keys(activeCase.perturbation?.expected_shifts || {}).map(h => h.split("(")[0].trim());
+  const fallback = ["Acute Coronary Syndrome", "Pulmonary Embolism", "Severe Sepsis / Infection", "Acute Surgical Abdomen"];
+  const pool = Array.from(new Set([...diffs, ...pertHyps, ...fallback])).filter(Boolean).slice(0, 5);
+
+  const seed = (activeCase.id || "impulse").split("").reduce((a, c) => a + c.charCodeAt(0), 0);
+  const options = pool.sort((a, b) => ((a.length * seed) % 7) - ((b.length * seed) % 7)).slice(0, 4);
+
+  container.innerHTML = options.map(opt => `
+    <button
+      type="button"
+      onclick="setSystem1Impulse('${escapeHtml(opt)}')"
+      id="sys1-chip-${escapeHtml(opt).replace(/[^a-zA-Z0-9]/g, '')}"
+      class="sys1-chip px-3 py-1.5 rounded-lg bg-[#090A10] hairline-border hover:border-emerald-400 text-xs text-zinc-300 font-medium transition min-h-[36px]"
+    >
+      ${escapeHtml(opt)}
+    </button>
+  `).join("");
+}
+
+function setSystem1Impulse(chipText) {
+  clientSession.system1Impulse = chipText;
+  const chips = document.querySelectorAll(".sys1-chip");
+  chips.forEach(c => {
+    if (c.innerText.trim() === chipText) {
+      c.className = "sys1-chip px-3 py-1.5 rounded-lg bg-emerald-500/20 border border-emerald-500/60 text-xs text-emerald-300 font-bold transition min-h-[36px]";
+    } else {
+      c.className = "sys1-chip px-3 py-1.5 rounded-lg bg-[#090A10]/50 border border-white/5 text-xs text-zinc-500 font-normal transition min-h-[36px] opacity-60";
+    }
+  });
+}
+
+// -------------------------------------------------------------
+// GAME COUNTERS & INTERACTION WIDGETS
+// -------------------------------------------------------------
+function updateGameCountersUI() {
   if (!activeCase) return;
   const clinicalGates = (activeCase.gates || []).filter(g => g.category !== "ice");
   const redFlagGates = clinicalGates.filter(g => g.mandatory_for_safety || g.category === "red_flag");
@@ -1468,72 +1714,221 @@ function renderGateChecklist() {
   const unlockedClinCount = clinicalGates.filter(g => clientSession.unlockedGateKeys.has(g.key)).length;
   const unlockedRfCount = redFlagGates.filter(g => clientSession.unlockedGateKeys.has(g.key)).length;
 
+  const turnEl = document.getElementById("game-turn-counter");
+  if (turnEl) turnEl.innerText = String(clientSession.turnCount);
+
+  const parEl = document.getElementById("game-par-target");
+  if (parEl) parEl.innerText = `${clientSession.parQuestions} Par`;
+
   const rfCounter = document.getElementById("red-flags-counter");
   if (rfCounter) rfCounter.innerText = `${unlockedRfCount}/${redFlagGates.length}`;
 
   const cgCounter = document.getElementById("gates-unlocked-counter");
   if (cgCounter) cgCounter.innerText = `${unlockedClinCount}/${clinicalGates.length}`;
 
+  const comboPill = document.getElementById("game-combo-pill");
+  if (comboPill) {
+    if (clientSession.comboCount >= 2) {
+      comboPill.innerText = `🔥 Combo x${clientSession.comboCount}`;
+      comboPill.classList.remove("hidden");
+    } else {
+      comboPill.classList.add("hidden");
+    }
+  }
+
   const bottomSummary = document.getElementById("bottom-bar-summary");
   if (bottomSummary) {
-    bottomSummary.innerText = `Red Flags: ${unlockedRfCount}/${redFlagGates.length} • Clues: ${unlockedClinCount}/${clinicalGates.length}`;
-  }
-
-  const container = document.getElementById("gates-checklist-container");
-  if (!container) return;
-  container.innerHTML = "";
-
-  clinicalGates.forEach(g => {
-    const isUnlocked = clientSession.unlockedGateKeys.has(g.key);
-    const isRf = g.mandatory_for_safety || g.category === "red_flag";
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.onclick = () => unlockSingleGateByClick(g.key);
-    btn.className = isUnlocked
-      ? "text-left px-3.5 py-2.5 rounded-xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-200 text-xs sm:text-sm font-semibold flex items-center justify-between gap-2.5 transition min-h-[44px]"
-      : "text-left px-3.5 py-2.5 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-zinc-300 text-xs sm:text-sm font-medium flex items-center justify-between gap-2.5 transition min-h-[44px]";
-
-    btn.innerHTML = `
-      <span class="truncate">${isUnlocked ? "✓" : (isRf ? "🚨" : "+")} ${escapeHtml(formatGateTitle(g.key))}</span>
-      <span class="font-mono text-xs text-zinc-400 font-semibold">${escapeHtml(g.category)}</span>
-    `;
-    container.appendChild(btn);
-  });
-}
-
-// -------------------------------------------------------------
-// SPEECH OUTPUT (1.4x TTS) & BROWSER VOICE INPUT
-// -------------------------------------------------------------
-function toggleVoiceOutputMode() {
-  isVoiceOutputEnabled = !isVoiceOutputEnabled;
-  const icon = document.getElementById("voice-mode-icon");
-  const label = document.getElementById("voice-mode-label");
-
-  if (isVoiceOutputEnabled) {
-    if (icon) icon.innerText = "🔊";
-    if (label) label.innerText = "1.4x Voice";
-  } else {
-    if (icon) icon.innerText = "🔇";
-    if (label) label.innerText = "Silent";
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    bottomSummary.innerText = `Turn ${clientSession.turnCount} / ${clientSession.parQuestions} Par • Red Flags: ${unlockedRfCount}/${redFlagGates.length} • Clues: ${unlockedClinCount}/${clinicalGates.length}`;
   }
 }
 
-function speakPatientText(text) {
+function toggleClinicalFrameworkGuide() {
+  const guide = document.getElementById("clinical-framework-guide");
+  const icon = document.getElementById("framework-guide-icon");
+  if (!guide) return;
+  const isHidden = guide.classList.toggle("hidden");
+  if (icon) icon.innerText = isHidden ? "▼" : "▲";
+}
+
+function toggleTranscriptDrawer() {
+  const drawer = document.getElementById("examiner-transcript-drawer");
+  const icon = document.getElementById("transcript-drawer-icon");
+  if (!drawer) return;
+  const isHidden = drawer.classList.toggle("hidden");
+  if (icon) icon.innerText = isHidden ? "▼ Expand" : "▲ Collapse";
+}
+
+const RAPID_SWEEP_MACROS = {
+  socrates: "site onset character radiation associated symptoms timing exacerbating relieving severity?",
+  red_flags: "fever chills night sweats weight loss syncope back pain hemoptysis neurological deficit bleeding?",
+  pmhx: "past medical history diabetes hypertension surgery medications blood thinners allergies compliance?",
+  social: "occupation army camp tekong travel hawker food smoking alcohol sexual history family history?",
+  bedside: "physical examination abdomen chest neuro pupils joints rash vitals pulse?"
+};
+
+function fireSpamMacro(macroType) {
+  const query = RAPID_SWEEP_MACROS[macroType] || macroType;
+  executeBlitzTurn(query);
+}
+
+// -------------------------------------------------------------
+// ARENA CIRCUIT ENGINE (3-Station Mock Exam)
+// -------------------------------------------------------------
+function startArenaCircuit() {
+  const cases = currentCases.length > 0 ? currentCases : Object.values(ALL_CASES_MAP);
+  if (!cases || cases.length === 0) return;
+
+  // Pick 3 diverse cases: 1 SG classic, 1 acute/cardio/resp, 1 other
+  const sgList = cases.filter(c => c.isSgClassic || String(c.id).startsWith("id_11") || String(c.id).startsWith("gastro_12"));
+  const cardioResp = cases.filter(c => c.cluster === "chest_pain" || c.cluster === "dyspnea");
+  const others = cases.filter(c => !sgList.includes(c) && !cardioResp.includes(c));
+
+  const st1 = sgList.length > 0 ? sgList[Math.floor(Math.random() * sgList.length)] : cases[0];
+  const st2 = cardioResp.length > 0 ? cardioResp[Math.floor(Math.random() * cardioResp.length)] : cases[1 % cases.length];
+  const st3 = others.length > 0 ? others[Math.floor(Math.random() * others.length)] : cases[2 % cases.length];
+
+  arenaCircuitState = {
+    active: true,
+    stationIndex: 0,
+    stations: [st1, st2, st3],
+    scores: []
+  };
+
+  const circuitBtn = document.getElementById("circuit-btn");
+  if (circuitBtn) {
+    circuitBtn.innerHTML = `<span>⚡ Station 1/3</span>`;
+    circuitBtn.classList.add("bg-emerald-500/20", "border-emerald-500/40", "text-emerald-300");
+  }
+
+  launchInstantBlitz(st1.id);
+}
+
+function handleNextStationAction() {
+  if (arenaCircuitState && arenaCircuitState.active) {
+    if (arenaCircuitState.stationIndex < arenaCircuitState.stations.length - 1) {
+      arenaCircuitState.stationIndex += 1;
+      const nextCase = arenaCircuitState.stations[arenaCircuitState.stationIndex];
+      const circuitBtn = document.getElementById("circuit-btn");
+      if (circuitBtn) {
+        circuitBtn.innerHTML = `<span>⚡ Station ${arenaCircuitState.stationIndex + 1}/3</span>`;
+      }
+      launchInstantBlitz(nextCase.id);
+      return;
+    } else {
+      // Circuit Finished!
+      const totalScore = Math.round(arenaCircuitState.scores.reduce((a, b) => a + b, 0) / Math.max(1, arenaCircuitState.scores.length));
+      alert(`🏆 Arena Circuit Complete!
+
+Overall Circuit Average: ${totalScore}%
+Stations: ${arenaCircuitState.stations.map((s, idx) => `Station ${idx+1}: ${arenaCircuitState.scores[idx] || 0}%`).join(" • ")}
+
+Great job on clinical reasoning under pressure!`);
+      arenaCircuitState = null;
+      const circuitBtn = document.getElementById("circuit-btn");
+      if (circuitBtn) {
+        circuitBtn.innerHTML = `<span>⚡ Arena Circuit</span>`;
+        circuitBtn.classList.remove("bg-emerald-500/20", "border-emerald-500/40", "text-emerald-300");
+      }
+      showView("cases-view");
+      return;
+    }
+  }
+
+  startRandomCase();
+}
+
+// -------------------------------------------------------------
+// REALISTIC VOICE ENGINE (EDGE NEURAL TTS + AUDIO CACHE + BROWSER FALLBACK)
+// -------------------------------------------------------------
+const patientAudioCache = new Map();
+let currentPatientAudio = null;
+
+function getPersonaVoiceName(caseObj) {
+  const persona = caseObj?.persona || {};
+  if (persona.voice_id) return persona.voice_id;
+
+  const gender = String(caseObj?.brief?.gender || caseObj?.gender || "").toLowerCase();
+  const isFemale = gender.startsWith("f");
+  const isSg = caseObj?.sg_classic || (caseObj?.specialty && caseObj.specialty.toLowerCase().includes("sg")) || (caseObj?.id && String(caseObj.id).startsWith("id_11"));
+
+  if (isSg) {
+    return isFemale ? "en-SG-LunaNeural" : "en-SG-WayneNeural";
+  }
+  return isFemale ? "en-GB-SoniaNeural" : "en-GB-RyanNeural";
+}
+
+async function speakPatientText(text) {
   if (!text || !isVoiceOutputEnabled) return;
+
+  const voiceName = getPersonaVoiceName(activeCase);
+  const cacheKey = `${voiceName}:::${text}`;
+
+  if (currentPatientAudio) {
+    try {
+      currentPatientAudio.pause();
+      currentPatientAudio.currentTime = 0;
+    } catch (_) {}
+    currentPatientAudio = null;
+  }
+  if (window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  }
+
+  // 1. Audio Cache Check
+  if (patientAudioCache.has(cacheKey)) {
+    const audioUrl = patientAudioCache.get(cacheKey);
+    const audio = new Audio(audioUrl);
+    currentPatientAudio = audio;
+    audio.play().catch(() => {});
+    return;
+  }
+
+  // 2. Microsoft Edge Neural Cloud TTS (/api/tts)
+  try {
+    const resp = await fetch("/api/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: text,
+        voice: voiceName,
+        rate: "+0%" // Natural realistic human pacing
+      })
+    });
+    if (resp.ok) {
+      const contentType = resp.headers.get("content-type") || "";
+      let audioUrl = null;
+      if (contentType.includes("application/json")) {
+        const data = await resp.json();
+        audioUrl = data?.audio_url;
+      } else {
+        const blob = await resp.blob();
+        audioUrl = URL.createObjectURL(blob);
+      }
+      if (audioUrl) {
+        patientAudioCache.set(cacheKey, audioUrl);
+        const audio = new Audio(audioUrl);
+        currentPatientAudio = audio;
+        audio.play().catch(() => {});
+        return;
+      }
+    }
+  } catch (_) {
+    // Cloud API not available, proceed to fallback
+  }
+
+  // 3. Browser Speech Synthesis Fallback (Warm 1.02x natural conversational cadence)
   if (window.speechSynthesis) {
     try {
-      window.speechSynthesis.cancel();
       if (window.speechSynthesis.resume) window.speechSynthesis.resume();
       const utter = new SpeechSynthesisUtterance(text);
-      utter.rate = 1.35;
-      utter.lang = "en-SG";
+      utter.rate = 1.02;
+      utter.pitch = 1.0;
 
-      // Select natural voice matching patient gender if available
       const voices = window.speechSynthesis.getVoices ? window.speechSynthesis.getVoices() : [];
       const gender = String(activeCase?.brief?.gender || activeCase?.gender || "").toLowerCase();
       const isFemale = gender.startsWith("f");
-      let match = voices.find(v => v.lang === "en-SG" && (isFemale ? /female|zira|samantha|karen/i.test(v.name) : /male|david|george/i.test(v.name)));
+
+      let match = voices.find(v => (v.name.includes("Natural") || v.name.includes("Online") || v.name.includes("Premium")) && (isFemale ? /female|zira|samantha|karen|victoria/i.test(v.name) : /male|david|george|daniel/i.test(v.name)));
       if (!match) match = voices.find(v => v.lang === "en-SG");
       if (!match) match = voices.find(v => v.lang.startsWith("en-GB") || v.lang.startsWith("en-AU"));
       if (!match) match = voices.find(v => v.lang.startsWith("en"));
@@ -1541,6 +1936,25 @@ function speakPatientText(text) {
 
       window.speechSynthesis.speak(utter);
     } catch (_) {}
+  }
+}
+
+function toggleVoiceOutputMode() {
+  isVoiceOutputEnabled = !isVoiceOutputEnabled;
+  const icon = document.getElementById("voice-mode-icon");
+  const label = document.getElementById("voice-mode-label");
+
+  if (isVoiceOutputEnabled) {
+    if (icon) icon.innerText = "🔊";
+    if (label) label.innerText = "Voice ON";
+  } else {
+    if (icon) icon.innerText = "🔇";
+    if (label) label.innerText = "Silent";
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (currentPatientAudio) {
+      try { currentPatientAudio.pause(); } catch (_) {}
+      currentPatientAudio = null;
+    }
   }
 }
 
@@ -1555,7 +1969,7 @@ function toggleMicrophoneRecord() {
 function startVoiceRecognition() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!SR) {
-    alert("Browser voice recognition is not supported in this browser. Type keywords or use the 1-tap sweep pills!");
+    alert("Browser voice recognition is not supported in this browser. Please type keywords in the command bar!");
     return;
   }
   try {
@@ -1584,7 +1998,6 @@ function startVoiceRecognition() {
       }
     };
     speechRecognizer.onerror = (e) => {
-      // Graceful fallback if device lacks en-SG voice pack
       if (e.error === "language-not-supported" && speechRecognizer) {
         try {
           speechRecognizer.lang = navigator.language || "en-US";
@@ -1615,58 +2028,27 @@ function updateMicUI(active) {
   const icon = document.getElementById("mic-icon");
   if (!btn || !icon) return;
   if (active) {
-    btn.className = "w-10 h-10 rounded-lg bg-rose-500/20 border border-rose-500/50 text-rose-400 mic-active flex items-center justify-center shrink-0 transition";
-    icon.className = "fa-solid fa-stop text-xs";
+    btn.className = "w-12 h-12 rounded-xl bg-rose-500/20 border border-rose-500/50 text-rose-400 mic-active flex items-center justify-center shrink-0 transition text-base";
+    icon.className = "fa-solid fa-stop text-base";
   } else {
-    btn.className = "w-10 h-10 rounded-lg bg-[#090A10] hairline-border hover:border-zinc-700 text-zinc-400 hover:text-zinc-100 flex items-center justify-center shrink-0 transition";
-    icon.className = "fa-solid fa-microphone text-xs";
+    btn.className = "w-12 h-12 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-500 text-zinc-300 hover:text-white flex items-center justify-center shrink-0 transition text-base";
+    icon.className = "fa-solid fa-microphone text-base";
   }
 }
 
 // -------------------------------------------------------------
-// VIEW 3: CLEAN DIAGNOSIS & VIVA STEP (TAKES 20 SECONDS)
+// VIEW 3: 20-SECOND DIAGNOSIS & MANAGEMENT SYNTHESIS
 // -------------------------------------------------------------
 function openDiagnosisAndVivaStep() {
   stopVoiceRecognition();
   if (!activeCase) return;
 
   const dxInput = document.getElementById("dx-input");
+  const rfDxInput = document.getElementById("red-flag-dx-input");
   const vivaInput = document.getElementById("viva-answer-input");
   if (dxInput) dxInput.value = "";
+  if (rfDxInput) rfDxInput.value = "";
   if (vivaInput) vivaInput.value = "";
-
-  // Populate Quick-Tap Diagnosis Suggestion Chips (Shuffled with distractors to challenge candidate)
-  const chipsEl = document.getElementById("dx-suggestion-chips");
-  if (chipsEl) {
-    const diffs = (activeCase.differentials || []).map(d => d.name.split("(")[0].trim());
-    const pertHyps = Object.keys(activeCase.perturbation?.expected_shifts || {}).map(h => h.split("(")[0].trim());
-    const fallbackDistractors = [
-      "Acute Sepsis / Severe Infection",
-      "Pulmonary Embolism",
-      "Acute Coronary Syndrome",
-      "Viral Exanthem",
-      "Community-Acquired Pneumonia",
-      "Acute Abdomen of Unknown Origin"
-    ];
-    const uniqueChips = Array.from(new Set([...diffs, ...pertHyps, ...fallbackDistractors])).slice(0, 6);
-    // Pseudo-shuffle so the primary diagnosis is not always first
-    const seed = (activeCase.id || "osce").split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-    const shuffled = uniqueChips.sort((a, b) => {
-      const hA = (a.length * seed) % 19;
-      const hB = (b.length * seed) % 19;
-      return hA - hB;
-    });
-
-    chipsEl.innerHTML = shuffled.map(chip => `
-      <button
-        type="button"
-        onclick="appendDiagnosisChip('${escapeHtml(chip)}')"
-        class="px-3.5 py-2 rounded-xl bg-[#090A10] hairline-border hover:border-zinc-400 hover:text-white text-xs sm:text-sm font-medium text-zinc-200 transition min-h-[40px]"
-      >
-        + ${escapeHtml(chip)}
-      </button>
-    `).join("");
-  }
 
   // Populate Examiner Prompts Helper
   const promptsEl = document.getElementById("viva-prompts-helper");
@@ -1676,12 +2058,15 @@ function openDiagnosisAndVivaStep() {
     promptsEl.innerHTML = questions.map((q, idx) => `
       <div class="space-y-1">
         <div class="font-bold text-zinc-100 text-xs sm:text-sm">Q${idx + 1}: ${escapeHtml(q.prompt || q.question || "")}</div>
-        <div class="text-xs sm:text-sm text-zinc-300 leading-relaxed">Key points: ${escapeHtml((q.key_points_required || q.key_points || []).join(" • "))}</div>
+        <div class="text-xs sm:text-sm text-zinc-300 leading-relaxed">Key points to address: ${escapeHtml((q.key_points_required || q.key_points || []).join(" • "))}</div>
       </div>
     `).join("");
   }
 
   showView("viva-view");
+  setTimeout(() => {
+    document.getElementById("dx-input")?.focus();
+  }, 100);
 }
 
 function appendDiagnosisChip(chipText) {
@@ -1700,39 +2085,43 @@ function toggleVivaPromptsHelper() {
 function autoFillModelPlan() {
   if (!activeCase) return;
   const dxInput = document.getElementById("dx-input");
+  const rfDxInput = document.getElementById("red-flag-dx-input");
   const vivaInput = document.getElementById("viva-answer-input");
 
-  const diffs = (activeCase.differentials || []).map(d => d.name).join("; ");
-  if (dxInput) {
-    dxInput.value = diffs || activeCase.title;
-  }
+  const diffs = (activeCase.differentials || []).map(d => d.name);
+  if (dxInput) dxInput.value = diffs[0] || activeCase.title;
+  if (rfDxInput) rfDxInput.value = diffs[1] || "Aortic Dissection / Pulmonary Embolism";
 
   const questions = activeCase.viva_questions || activeCase.post_encounter_viva || [];
   const allKeyPoints = questions.flatMap(q => q.key_points_required || q.key_points || []);
-  if (vivaInput) {
-    vivaInput.value = allKeyPoints.join("; ");
-  }
+  if (vivaInput) vivaInput.value = allKeyPoints.join("; ");
 }
 
+// -------------------------------------------------------------
+// GRADING ENGINE & VIEW 4: SCORECARD & DEBRIEF
+// -------------------------------------------------------------
 function gradeStationNow() {
   clearInterval(timerInterval);
   if (!activeCase) return;
 
   const dxText = document.getElementById("dx-input")?.value.trim() || "";
+  const rfDxText = document.getElementById("red-flag-dx-input")?.value.trim() || "";
   const planText = document.getElementById("viva-answer-input")?.value.trim() || "";
-  const combinedText = `${dxText} ${planText}`.trim();
+  const combinedText = `${dxText} ${rfDxText} ${planText}`.trim();
 
-  // Evaluate diagnosis concordance if twist wasn't manually voted
+  // Evaluate primary diagnosis concordance
   const primaryDiff = (activeCase.differentials && activeCase.differentials[0]?.name) || activeCase.title || "";
   const primaryWords = primaryDiff.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length >= 4);
   const dxMentioned = primaryWords.some(w => combinedText.toLowerCase().includes(w));
   if (dxMentioned && !clientSession.perturbationVoted) {
+    clientSession.sctConcordance = 95.0;
     clientSession.perturbationConcordance = 95.0;
   } else if (!dxMentioned && !clientSession.perturbationVoted && dxText.length === 0) {
+    clientSession.sctConcordance = 50.0;
     clientSession.perturbationConcordance = 50.0;
   }
 
-  // Evaluate Viva Questions against combinedText
+  // Evaluate Viva Questions
   const questions = activeCase.viva_questions || activeCase.post_encounter_viva || [];
   clientSession.vivaScores = {};
   clientSession.vivaAnswers = [];
@@ -1748,7 +2137,7 @@ function gradeStationNow() {
     });
   });
 
-  renderFinalScorecard(dxText, planText);
+  renderFinalScorecard(dxText, rfDxText, planText);
   showView("scorecard-view");
 }
 
@@ -1774,13 +2163,10 @@ function evaluateSingleVivaAnswerClientSide(q, answerText) {
   return { awarded, matched };
 }
 
-// -------------------------------------------------------------
-// VIEW 4: MINIMALIST SCORECARD & TEXTBOOK APPROACH SHEET
-// -------------------------------------------------------------
 function detectCognitiveTrapsClientSide(combinedAnswerText) {
   if (!activeCase || !activeCase.cognitive_traps) return [];
   const fullText = `${clientSession.perturbationReasoning || ""} ${combinedAnswerText || ""}`.toLowerCase();
-  const negRe = /\b(avoid\w*|no|not|never|don'?t|do not|contraindicat\w*|withhold|without|instead of)\b/i;
+  const negRe = /(avoid\w*|no|not|never|don'?t|do not|contraindicat\w*|withhold|without|instead of)/i;
   const triggered = [];
 
   activeCase.cognitive_traps.forEach(trap => {
@@ -1809,7 +2195,9 @@ function detectCognitiveTrapsClientSide(combinedAnswerText) {
   return triggered;
 }
 
-function renderFinalScorecard(dxText, planText) {
+let latestWordleScorecard = "";
+
+function renderFinalScorecard(dxText, redFlagDxText, planText) {
   const gates = activeCase.gates || [];
   const redFlagGates = gates.filter(g => g.mandatory_for_safety || g.category === "red_flag");
   const clinicalTriggerGates = gates.filter(g => g.category !== "ice" && !g.mandatory_for_safety && g.category !== "red_flag");
@@ -1817,7 +2205,6 @@ function renderFinalScorecard(dxText, planText) {
   const assistedKeys = clientSession.assistedGateKeys || new Set();
   const rfUnlocked = redFlagGates.filter(g => clientSession.unlockedGateKeys.has(g.key)).length;
   const rfAssisted = redFlagGates.filter(g => clientSession.unlockedGateKeys.has(g.key) && assistedKeys.has(g.key)).length;
-  // Red flags you asked about yourself score in full; ones revealed by a macro or click award 0 pts
   const rfIndependent = redFlagGates.filter(g => clientSession.unlockedGateKeys.has(g.key) && !assistedKeys.has(g.key)).length;
   const rfRatio = redFlagGates.length > 0 ? rfIndependent / redFlagGates.length : 1.0;
   const rfScore = Math.round(rfRatio * 40 * 10) / 10;
@@ -1826,8 +2213,9 @@ function renderFinalScorecard(dxText, planText) {
   const ctRatio = clinicalTriggerGates.length > 0 ? ctUnlocked / clinicalTriggerGates.length : 1.0;
   const ctScore = Math.round(ctRatio * 20 * 10) / 10;
 
-  const traps = detectCognitiveTrapsClientSide(`${dxText} ${planText}`);
-  const rawPivotScore = (clientSession.perturbationConcordance / 100.0) * 25.0;
+  const traps = detectCognitiveTrapsClientSide(`${dxText} ${redFlagDxText} ${planText}`);
+  const sctConcordanceVal = clientSession.sctConcordance ?? clientSession.perturbationConcordance ?? 100.0;
+  const rawPivotScore = (sctConcordanceVal / 100.0) * 25.0;
   const pivotScore = Math.max(0, Math.round((rawPivotScore - traps.length * 2.5) * 10) / 10);
 
   const questions = activeCase.viva_questions || activeCase.post_encounter_viva || [];
@@ -1836,17 +2224,33 @@ function renderFinalScorecard(dxText, planText) {
   const vivaRatio = vivaAwardedTotal / Math.max(1, vivaMaxTotal);
   const vivaScore = Math.round(vivaRatio * 15 * 10) / 10;
 
-  const totalScore = Math.round(rfScore + ctScore + pivotScore + vivaScore);
+  const totalScore = Math.min(100, Math.round(rfScore + ctScore + pivotScore + vivaScore));
   const safetyPass = redFlagGates.filter(g => g.mandatory_for_safety && (!clientSession.unlockedGateKeys.has(g.key) || assistedKeys.has(g.key))).length === 0;
+  const isUnderPar = clientSession.turnCount <= clientSession.parQuestions;
 
-  let grade = "Clear Pass";
-  if (!safetyPass) grade = "Safety Alert";
-  else if (totalScore >= 85) grade = "Distinction";
-  else if (totalScore >= 65) grade = "Clear Pass";
-  else if (totalScore >= 50) grade = "Borderline";
-  else grade = "Review Needed";
+  let grade = "Pass";
+  let gradeBadgeText = "Pass (Birdie 🐦)";
+  if (!safetyPass) {
+    grade = "Unsatisfactory";
+    gradeBadgeText = "Safety Alert (Bogey ⚠️)";
+  } else if (totalScore >= 85 && isUnderPar) {
+    grade = "Distinction";
+    gradeBadgeText = "Distinction (Eagle 🦅)";
+  } else if (totalScore >= 85) {
+    grade = "Distinction";
+    gradeBadgeText = "Distinction (Birdie 🐦)";
+  } else if (totalScore >= 70) {
+    grade = "Pass";
+    gradeBadgeText = "Clear Pass (Birdie 🐦)";
+  } else if (totalScore >= 50) {
+    grade = "Borderline";
+    gradeBadgeText = "Borderline (Par ⛳)";
+  } else {
+    grade = "Review Needed";
+    gradeBadgeText = "Review Needed (Bogey ⚠️)";
+  }
 
-  // 1. Header
+  // Header & Title
   document.getElementById("card-case-title").innerText = activeCase.title;
   document.getElementById("scorecard-specialty-tag").innerText = `• ${activeCase.specialty || ""}`;
   const primaryDiff = (activeCase.differentials && activeCase.differentials[0]?.name) || activeCase.title;
@@ -1856,19 +2260,19 @@ function renderFinalScorecard(dxText, planText) {
   if (scorePctEl) {
     scorePctEl.innerText = `${totalScore}%`;
     scorePctEl.className = safetyPass
-      ? "font-mono text-3xl sm:text-4xl font-bold text-emerald-400"
-      : "font-mono text-3xl sm:text-4xl font-bold text-amber-400";
+      ? "font-mono text-4xl sm:text-5xl font-black text-emerald-400"
+      : "font-mono text-4xl sm:text-5xl font-black text-amber-400";
   }
 
   const gradeBadge = document.getElementById("card-grade-badge");
   if (gradeBadge) {
-    gradeBadge.innerText = grade;
+    gradeBadge.innerText = gradeBadgeText;
     gradeBadge.className = safetyPass
-      ? "text-xs font-semibold px-2 py-0.5 rounded border border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-      : "text-xs font-semibold px-2 py-0.5 rounded border border-amber-500/30 bg-amber-500/10 text-amber-300";
+      ? "text-xs sm:text-sm font-bold px-3 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+      : "text-xs sm:text-sm font-bold px-3 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/30";
   }
 
-  // Persist this attempt once per station run (re-renders must not double count)
+  // Persist attempt
   let progressNote = "";
   if (!clientSession.progressRecorded) {
     clientSession.progressRecorded = recordProgress(activeCase.id, totalScore, elapsedSeconds);
@@ -1885,13 +2289,26 @@ function renderFinalScorecard(dxText, planText) {
     timeComp.innerText = `Time: ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)} target${progressNote}`;
   }
 
-  // 2. 4 Clean Metric Pills
+  // If Arena Circuit active, track score
+  if (arenaCircuitState && arenaCircuitState.active) {
+    arenaCircuitState.scores.push(totalScore);
+    const nextBtn = document.getElementById("next-station-action-btn");
+    if (nextBtn) {
+      if (arenaCircuitState.stationIndex < arenaCircuitState.stations.length - 1) {
+        nextBtn.innerHTML = `<span>⚡ Next Circuit Station (${arenaCircuitState.stationIndex + 2}/3) →</span>`;
+      } else {
+        nextBtn.innerHTML = `<span>🏆 Finish Arena Circuit</span>`;
+      }
+    }
+  }
+
+  // 2. 4 Metric Score Pillars
   const metricsGrid = document.getElementById("card-metrics-grid");
   if (metricsGrid) {
     const metrics = [
       { label: "Red Flags (40%)", val: `${rfScore}/40`, sub: rfAssisted ? `${rfIndependent}/${redFlagGates.length} · ${rfAssisted} assisted` : `${rfIndependent}/${redFlagGates.length} cleared`, ratio: rfScore / 40 },
       { label: "History (20%)", val: `${ctScore}/20`, sub: `${ctUnlocked}/${clinicalTriggerGates.length} clues`, ratio: ctScore / 20 },
-      { label: "Dx & Twist (25%)", val: `${pivotScore}/25`, sub: `${Math.round((pivotScore / 25) * 100)}% align`, ratio: pivotScore / 25 },
+      { label: "Dx & SCT Twist (25%)", val: `${pivotScore}/25`, sub: `${Math.round((pivotScore / 25) * 100)}% align`, ratio: pivotScore / 25 },
       { label: "Management (15%)", val: `${vivaScore}/15`, sub: `${Math.round(vivaRatio * 100)}% key pts`, ratio: vivaScore / 15 }
     ];
     metricsGrid.innerHTML = metrics.map(m => {
@@ -1907,7 +2324,7 @@ function renderFinalScorecard(dxText, planText) {
     }).join("");
   }
 
-  // 3. Red Flags List
+  // 3. Red Flags Safety Audit
   const rfListEl = document.getElementById("card-redflags-list");
   if (rfListEl) {
     rfListEl.innerHTML = redFlagGates.map(g => {
@@ -1917,7 +2334,7 @@ function renderFinalScorecard(dxText, planText) {
       const statusBadge = (cleared && !prompted)
         ? '<span class="text-xs font-mono font-bold text-emerald-400">✓ Cleared</span>'
         : prompted
-        ? '<span class="text-xs font-mono text-zinc-400 font-medium">[Revealed by assist — 0 pts]</span>'
+        ? '<span class="text-xs font-mono text-zinc-400 font-medium">[Assisted - 0 pts]</span>'
         : '<span class="text-xs font-mono font-bold text-rose-400">Missed</span>';
       return `
         <div class="bg-[#090A10] hairline-border rounded-xl p-3 sm:p-3.5 flex items-start gap-3">
@@ -1934,7 +2351,7 @@ function renderFinalScorecard(dxText, planText) {
     }).join("");
   }
 
-  // 3b. Clinical History & Bedside Findings Audit
+  // 3b. History & Bedside Findings Audit
   const cluesCounterEl = document.getElementById("card-clues-counter");
   if (cluesCounterEl) {
     cluesCounterEl.innerText = `${ctUnlocked}/${clinicalTriggerGates.length} Cleared (${ctScore}/20 pts)`;
@@ -1960,7 +2377,42 @@ function renderFinalScorecard(dxText, planText) {
     }).join("");
   }
 
-  // 4. Cognitive Traps
+  // 3c. Diagnostic Discrimination Matrix Table
+  const diffsTable = document.getElementById("card-differentials-table");
+  if (diffsTable) {
+    const diffs = activeCase.differentials || [];
+    diffsTable.innerHTML = `
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs sm:text-sm hairline-border rounded-xl overflow-hidden">
+          <thead class="bg-[#090A10] hairline-border-b text-zinc-400 font-mono text-[11px] uppercase tracking-wider">
+            <tr>
+              <th class="p-3">Differential Diagnosis</th>
+              <th class="p-3">Key Differentiating Features</th>
+              <th class="p-3 text-right">Status</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5 bg-[#090A10]/50">
+            ${diffs.map((d, i) => {
+              const isPrimary = i === 0;
+              const feats = (d.supporting_features || []).join(" • ");
+              const statusTag = isPrimary
+                ? '<span class="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-bold text-xs">Primary</span>'
+                : '<span class="px-2 py-0.5 rounded bg-zinc-700/40 text-zinc-300 font-mono text-xs">Excluded</span>';
+              return `
+                <tr>
+                  <td class="p-3 font-semibold text-zinc-100 whitespace-nowrap">${escapeHtml(d.name)}</td>
+                  <td class="p-3 text-zinc-300 leading-relaxed">${escapeHtml(feats || "Clinical presentation & bedside investigation findings")}</td>
+                  <td class="p-3 text-right whitespace-nowrap">${statusTag}</td>
+                </tr>
+              `;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  // 4. Cognitive Traps & Dual-Process Audit
   const trapsSec = document.getElementById("card-traps-section");
   const trapsContainer = document.getElementById("card-traps-container");
   if (trapsSec && trapsContainer) {
@@ -1968,7 +2420,7 @@ function renderFinalScorecard(dxText, planText) {
       trapsSec.classList.remove("hidden");
       trapsContainer.innerHTML = traps.map(t => `
         <div class="bg-[#090A10] hairline-border rounded-xl p-3.5 space-y-1.5">
-          <div class="text-xs sm:text-sm font-bold text-amber-300">⚠️ ${escapeHtml(t.name)}</div>
+          <div class="text-xs sm:text-sm font-bold text-amber-300">⚠️ Cognitive Trap Triggered: ${escapeHtml(t.name)}</div>
           <div class="text-xs sm:text-sm text-zinc-300 leading-relaxed">${escapeHtml(t.remediation)}</div>
         </div>
       `).join("");
@@ -1977,7 +2429,29 @@ function renderFinalScorecard(dxText, planText) {
     }
   }
 
-  // 5. Clinical Approach Summary Card (from OSCE Study Reference + Case Reference)
+  // 5. Turn-by-Turn Examiner Transcript Drawer
+  const transcriptDrawer = document.getElementById("examiner-transcript-drawer");
+  if (transcriptDrawer) {
+    const turns = clientSession.transcriptTurns || [];
+    if (turns.length === 0) {
+      transcriptDrawer.innerHTML = `<div class="text-zinc-500 italic">No inquiries recorded for this station.</div>`;
+    } else {
+      transcriptDrawer.innerHTML = turns.map(t => `
+        <div class="border-b border-white/5 pb-2.5 last:border-0 last:pb-0 space-y-1">
+          <div class="flex items-center justify-between text-[11px] font-mono text-zinc-400">
+            <span class="text-emerald-400 font-bold">Turn ${t.turn}</span>
+            <span>Query: "${escapeHtml(t.query)}"</span>
+          </div>
+          <div class="text-zinc-200">
+            ${t.newlyUnlocked.length > 0 ? `<span class="text-emerald-300 font-semibold">Unlocked:</span> ${escapeHtml(t.newlyUnlocked.join(", "))}` : `<span class="text-zinc-400">No new gates unlocked</span>`}
+            ${t.pertinentNegatives.length > 0 ? ` · <span class="text-zinc-400">Negatives: ${escapeHtml(t.pertinentNegatives.join(", "))}</span>` : ""}
+          </div>
+        </div>
+      `).join("");
+    }
+  }
+
+  // 6. Clinical Approach Summary Card
   const cluster = inferSymptomCluster(activeCase);
   const libEntry = SYMPTOM_APPROACH_LIBRARY[cluster] || SYMPTOM_APPROACH_LIBRARY.fever;
   const caseRef = activeCase.approach_reference || {};
@@ -1986,11 +2460,6 @@ function renderFinalScorecard(dxText, planText) {
   if (sourceBadge) {
     sourceBadge.innerText = caseRef.source || libEntry.source || "Finals Approach";
   }
-
-  const diffsHtml = (activeCase.differentials || []).map(d => {
-    const feats = (d.supporting_features || []).join("; ");
-    return `<li><strong class="text-white">${escapeHtml(d.name)}</strong>${feats ? ` — <span class="text-zinc-300">${escapeHtml(feats)}</span>` : ""}</li>`;
-  }).join("");
 
   const vivaHtml = questions.map((q, i) => {
     const pts = (q.key_points_required || q.key_points || []).map(p => `<li class="ml-4 list-disc text-zinc-200">${escapeHtml(p)}</li>`).join("");
@@ -2016,11 +2485,6 @@ function renderFinalScorecard(dxText, planText) {
         </div>
       </div>
 
-      <div class="bg-[#090A10] hairline-border rounded-xl p-4 space-y-2">
-        <div class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">Top Differentials &amp; Discriminating Features</div>
-        <ul class="space-y-1.5 list-disc list-inside text-xs sm:text-sm text-zinc-200">${diffsHtml}</ul>
-      </div>
-
       <div class="bg-[#090A10] hairline-border rounded-xl p-4 space-y-3">
         <div class="text-xs font-mono uppercase tracking-wider text-zinc-300 font-bold">Gold-Standard Investigations &amp; Management Key</div>
         <div class="space-y-2.5 text-xs sm:text-sm">${vivaHtml}</div>
@@ -2028,36 +2492,53 @@ function renderFinalScorecard(dxText, planText) {
     `;
   }
 
-  const rfReport = redFlagGates.map(g => {
-    const cleared = clientSession.unlockedGateKeys.has(g.key);
-    const prompted = cleared && assistedKeys.has(g.key);
-    const tag = cleared && !prompted ? "✓ Cleared" : prompted ? "[Assisted - 0 pts]" : "✗ Missed";
-    return `- ${tag}: ${formatGateTitle(g.key)}`;
-  }).join("\n");
+  // 7. Wordle-Style Shareable Scorecard Text Generator
+  const rfSquares = redFlagGates.map(g => clientSession.unlockedGateKeys.has(g.key) ? "🟩" : "🟥").join("");
+  const parIcon = isUnderPar ? "🦅 Eagle" : "⛳ Par";
+  const sctIcon = sctConcordanceVal >= 75 ? "🟩" : "🟨";
 
-  const diffsReport = (activeCase.differentials || []).map(d => {
-    const feats = (d.supporting_features || []).join("; ");
-    return `- **${d.name}**: ${feats || "Key clinical features"}`;
-  }).join("\n");
+  latestWordleScorecard = [
+    `⚡ OSCEBlitz #${activeCase.id} — ${activeCase.title}`,
+    `🎯 Turn ${clientSession.turnCount}/${clientSession.parQuestions} Par (${parIcon}) | Score: ${totalScore}% (${grade})`,
+    `🛡️ Safety Red Flags: ${rfSquares} (${rfIndependent}/${redFlagGates.length})`,
+    `💡 SCT Bedside Twist: ${sctIcon} ${sctConcordanceVal}% Concordance`,
+    `⏱️ Time: ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)} target`,
+    `https://osceblitz.vercel.app`
+  ].join("\n");
 
   latestMarkdownReport = [
     `# OSCEBlitz Study Card — ${activeCase.title}`,
-    `**Score:** ${totalScore}% (${grade}) | **Time:** ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)} target`,
-    `**Pillars:** Red Flags: ${rfScore}/40 | History: ${ctScore}/20 | Dx & Twist: ${pivotScore}/25 | Management: ${vivaScore}/15`,
+    `**Score:** ${totalScore}% (${gradeBadgeText}) | **Time:** ${formatSecondsMMSS(elapsedSeconds)} / ${formatSecondsMMSS(targetSeconds)} target`,
+    `**Pillars:** Red Flags: ${rfScore}/40 | History: ${ctScore}/20 | Dx & SCT Twist: ${pivotScore}/25 | Management: ${vivaScore}/15`,
     `**Primary Diagnosis:** ${primaryDiff}`,
     ``,
-    `## Red Flags Safety Audit`,
-    rfReport,
+    `## Safety Red Flags Audit`,
+    ...redFlagGates.map(g => `- ${clientSession.unlockedGateKeys.has(g.key) ? "✓ Cleared" : "✗ Missed"}: ${formatGateTitle(g.key)}`),
     ``,
-    `## Key Diagnostic Rationale & Bedside Twist`,
+    `## Attending Rationale & Bedside Twist`,
     activeCase.perturbation?.expert_rationale || caseRef.framework || "",
-    ``,
-    `## Top Differentials & Discriminating Features`,
-    diffsReport,
     ``,
     `## Gold-Standard Management Key`,
     ...questions.flatMap(q => (q.key_points_required || q.key_points || []).map(p => `- ${p}`))
   ].join("\n");
+}
+
+function copyShareableScorecard() {
+  if (!latestWordleScorecard) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(latestWordleScorecard).then(() => {
+      const btn = document.getElementById("share-scorecard-btn");
+      if (btn) {
+        const orig = btn.innerText;
+        btn.innerText = "✓ Copied to Clipboard!";
+        setTimeout(() => { btn.innerText = orig; }, 2000);
+      }
+    }).catch(() => {
+      if (typeof alert === "function") alert("Scorecard copied:\n\n" + latestWordleScorecard);
+    });
+  } else {
+    if (typeof alert === "function") alert("Scorecard copied:\n\n" + latestWordleScorecard);
+  }
 }
 
 function retryCurrentStation() {
@@ -2070,7 +2551,9 @@ function retryCurrentStation() {
 
 function copyMarkdownReport() {
   if (!latestMarkdownReport) return;
-  navigator.clipboard.writeText(latestMarkdownReport).then(() => {
-    alert("Study summary copied to clipboard!");
-  }).catch(() => {});
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(latestMarkdownReport).then(() => {
+      if (typeof alert === "function") alert("Study summary copied to clipboard!");
+    }).catch(() => {});
+  }
 }

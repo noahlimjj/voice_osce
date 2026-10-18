@@ -13,22 +13,26 @@ if str(_REPO_ROOT.parent) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT.parent))
 
 from starlette.requests import Request
+from starlette.middleware.base import BaseHTTPMiddleware
 from web.server import app
 
 
-@app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
-async def catch_all_debug(request: Request, path_name: str):
-    # Test if path_name is a known api endpoint
-    # E.g. if path_name is 'health' or 'api/health' or 'api/index.py'
-    matched = request.headers.get("x-matched-path", "")
-    return {
-        "catch_all": True,
-        "path_name": path_name,
-        "scope_path": request.scope.get("path"),
-        "url_path": request.url.path,
-        "x_matched_path": matched,
-        "headers": {k: v for k, v in request.headers.items() if "auth" not in k.lower()}
-    }
+class VercelPathNormalizerMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        path = request.scope.get("path", "")
+        if path.startswith("/api/index.py"):
+            rest = path[len("/api/index.py"):]
+            if not rest or rest == "/":
+                request.scope["path"] = "/api/health"
+            else:
+                request.scope["path"] = f"/api{rest}" if not rest.startswith("/api") else rest
+        elif not path.startswith("/api") and path != "/":
+            request.scope["path"] = f"/api{path}"
 
+        response = await call_next(request)
+        return response
+
+
+app.add_middleware(VercelPathNormalizerMiddleware)
 
 __all__ = ["app"]
